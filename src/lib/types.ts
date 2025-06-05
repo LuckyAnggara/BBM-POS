@@ -1,4 +1,6 @@
 
+import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, Role as PrismaRole, PurchaseOrderStatus as PrismaPurchaseOrderStatus } from '@prisma/client';
+
 export interface Product {
   id: string;
   name: string;
@@ -10,10 +12,10 @@ export interface Product {
   supplier?: string | null;
   description?: string | null;
   imageUrl?: string | null;
-  tags?: string[]; 
+  tags?: string[];
   lowStockThreshold?: number | null;
-  createdAt: string; 
-  updatedAt: string; 
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
 }
 
 export interface CartItem {
@@ -24,44 +26,48 @@ export interface CartItem {
   imageUrl?: string | null;
 }
 
-export interface PurchaseOrder {
-  id:string;
-  poNumber: string;
-  supplierId: string;
-  supplierName: string; 
-  orderDate: string; 
-  expectedDeliveryDate?: string; 
-  status: 'Draft' | 'Pending Approval' | 'Approved' | 'Ordered' | 'Shipped' | 'Partially Received' | 'Received' | 'Cancelled' | 'Closed';
-  items: Array<{
-    productId: string;
-    productName: string; 
-    quantityOrdered: number;
-    quantityReceived?: number;
-    unitCost: number;
-    totalCost: number;
-  }>;
-  discountAmount?: number;
-  shippingCost?: number;
-  taxes?: number;
-  totalAmount: number;
-  notes?: string;
-  createdBy: string; 
-  createdAt: string; 
-  updatedAt: string; 
+export type PurchaseOrderStatus = PrismaPurchaseOrderStatus;
+
+export interface PurchaseOrderItem {
+  id: string;
+  productId: string;
+  productName: string;
+  quantityOrdered: number;
+  quantityReceived?: number | null;
+  unitCost: number;
+  totalCost: number; // Calculated: quantityOrdered * unitCost
+  product?: Product; // Optional: for displaying product details if needed
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
 }
 
-// Matches Prisma Role Enum
-export enum UserRole {
-  ADMIN = 'ADMIN',
-  MANAGER = 'MANAGER',
-  STAFF = 'STAFF',
+export interface PurchaseOrder {
+  id: string;
+  poNumber: string;
+  supplierName: string;
+  orderDate: string; // ISO date string
+  expectedDeliveryDate?: string | null; // ISO date string
+  status: PurchaseOrderStatus;
+  items: PurchaseOrderItem[];
+  discountAmount?: number | null;
+  shippingCost?: number | null;
+  taxes?: number | null;
+  totalAmount: number;
+  notes?: string | null;
+  createdById: string;
+  createdBy?: User; // For displaying user info
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
 }
+
+
+export type UserRole = PrismaRole;
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole; // Use the enum
+  role: UserRole;
   avatarUrl?: string | null;
   isActive: boolean;
   lastLogin?: string | null; // ISO date string or null
@@ -77,6 +83,6 @@ export interface Supplier {
   phone?: string;
   address?: string;
   notes?: string;
-  createdAt: string; 
-  updatedAt: string; 
+  createdAt: string;
+  updatedAt: string;
 }

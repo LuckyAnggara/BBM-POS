@@ -1,3 +1,4 @@
+
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
@@ -8,20 +9,34 @@ generator client {
 }
 
 model Product {
-  id                String    @id @default(cuid())
-  name              String
-  sku               String    @unique
-  category          String
-  quantity          Int
-  price             Float
-  costPrice         Float?
-  supplier          String?
-  description       String?
-  imageUrl          String?
-  tags              String? // Store as JSON string
-  lowStockThreshold Int?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                 String  @id @default(cuid())
+  name               String
+  sku                String  @unique
+  category           String
+  quantity           Int
+  price              Float
+  costPrice          Float?
+  supplier           String?
+  description        String?
+  imageUrl           String?
+  tags               String? // Store as JSON string
+  lowStockThreshold  Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  purchaseOrderItems PurchaseOrderItem[]
+}
+
+model User {
+  id              String   @id @default(cuid())
+  name            String
+  email           String   @unique
+  role            Role
+  avatarUrl       String?
+  isActive        Boolean  @default(true)
+  lastLogin       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  purchaseOrders  PurchaseOrder[]
 }
 
 enum Role {
@@ -30,14 +45,55 @@ enum Role {
   STAFF
 }
 
-model User {
-  id          String    @id @default(cuid())
-  name        String
-  email       String    @unique
-  role        Role      @default(STAFF)
-  avatarUrl   String?
-  isActive    Boolean   @default(true)
-  lastLogin   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+model PurchaseOrder {
+  id                    String   @id @default(cuid())
+  poNumber              String   @unique
+  supplierName          String
+  orderDate             DateTime
+  expectedDeliveryDate  DateTime?
+  status                PurchaseOrderStatus
+  discountAmount        Float?
+  shippingCost          Float?
+  taxes                 Float?
+  totalAmount           Float
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  items PurchaseOrderItem[]
+}
+
+model PurchaseOrderItem {
+  id                String   @id @default(cuid())
+  quantityOrdered   Int
+  quantityReceived  Int?
+  unitCost          Float
+  totalCost         Float // Calculated: quantityOrdered * unitCost
+  productName       String   // Denormalized product name at time of order
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([purchaseOrderId, productId]) // Ensure a product is listed only once per PO
+}
+
+enum PurchaseOrderStatus {
+  Draft
+  PendingApproval
+  Approved
+  Ordered
+  Shipped
+  PartiallyReceived
+  Received
+  Cancelled
+  Closed
 }

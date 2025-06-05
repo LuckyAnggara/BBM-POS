@@ -28,20 +28,23 @@ import {
 } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { useInventoryStore } from '@/store/inventory-store';
-import type { Product, PurchaseOrder } from '@/lib/types';
-import { mockPurchaseOrders } from '@/lib/mock-data';
+import type { Product, PurchaseOrder, PurchaseOrderStatus } from '@/lib/types'; // Ensure PurchaseOrderStatus is imported
+// Removed mockPurchaseOrders import as we use DB now
 import { toast } from 'sonner';
 import { Save, ArrowLeft, PlusCircle, Trash2, CalendarIcon, Loader2, ChevronsUpDown, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
+import { createPurchaseOrder } from '../actions'; // Import server action
 
+// This schema should be consistent with the edit page, including status if needed for create, though status is often default.
 const purchaseOrderItemSchema = z.object({
   productId: z.string().min(1, "Product selection is required"),
   productName: z.string(), 
   quantityOrdered: z.coerce.number().int().min(1, "Quantity must be at least 1"),
   unitCost: z.coerce.number().min(0, "Unit cost must be non-negative"),
+  quantityReceived: z.coerce.number().int().min(0).optional().nullable(), // Added for consistency with edit
 });
 
 export type PurchaseOrderItemFormValues = z.infer<typeof purchaseOrderItemSchema>;
@@ -56,6 +59,7 @@ const purchaseOrderSchema = z.object({
   shippingCost: z.coerce.number().min(0, "Shipping cost must be non-negative").optional().or(z.literal('')),
   taxes: z.coerce.number().min(0, "Taxes must be non-negative").optional().or(z.literal('')),
   notes: z.string().optional(),
+  status: z.custom<PurchaseOrderStatus>().optional(), // Status is usually defaulted on create
 });
 
 export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
@@ -73,15 +77,16 @@ export default function CreatePurchaseOrderPage() {
   const form = useForm<PurchaseOrderFormValues>({
     resolver: zodResolver(purchaseOrderSchema),
     defaultValues: {
-      poNumber: `PO-${new Date().getFullYear()}-${String(mockPurchaseOrders.length + 1).padStart(4, '0')}`,
+      poNumber: `PO-${new Date().getFullYear()}-${String(Math.floor(Math.random()*10000)).padStart(4, '0')}`, // Generate a somewhat unique PO
       supplierName: '',
       orderDate: new Date(),
       expectedDeliveryDate: undefined,
-      items: [{ productId: '', productName: '', quantityOrdered: 1, unitCost: 0 }],
+      items: [{ productId: '', productName: '', quantityOrdered: 1, unitCost: 0, quantityReceived: 0 }],
       discountAmount: '',
       shippingCost: '',
       taxes: '',
       notes: '',
+      status: 'Draft', // Default status
     },
   });
 
@@ -102,38 +107,14 @@ export default function CreatePurchaseOrderPage() {
     return items.reduce((sum, item) => sum + ((item.quantityOrdered || 0) * (item.unitCost || 0)), 0);
   };
 
+  // Placeholder for user ID - in a real app, this would come from auth state
+  const MOCK_USER_ID = "user_admin_alice"; 
+
   const onSubmit = async (data: PurchaseOrderFormValues) => {
     setIsSubmitting(true);
     try {
-      const subtotal = calculateSubtotal(data.items);
-      const discount = data.discountAmount ? Number(data.discountAmount) : 0;
-      const shipping = data.shippingCost ? Number(data.shippingCost) : 0;
-      const taxAmount = data.taxes ? Number(data.taxes) : 0;
-      const totalAmount = subtotal - discount + shipping + taxAmount;
-
-      const newPO: PurchaseOrder = {
-        id: `po${Date.now()}`, 
-        poNumber: data.poNumber,
-        supplierId: `sup${Date.now()}`, 
-        supplierName: data.supplierName,
-        orderDate: data.orderDate.toISOString(),
-        expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
-        status: 'Draft', 
-        items: data.items.map(item => ({
-          ...item,
-          totalCost: item.quantityOrdered * item.unitCost,
-        })),
-        discountAmount: discount,
-        shippingCost: shipping,
-        taxes: taxAmount,
-        totalAmount,
-        notes: data.notes,
-        createdBy: 'user-placeholder', 
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      mockPurchaseOrders.push(newPO); 
+      // createdById would come from authentication in a real app
+      await createPurchaseOrder(data, MOCK_USER_ID); 
       toast.success('Purchase Order created successfully!');
       router.push('/purchasing');
     } catch (error) {
@@ -384,7 +365,7 @@ export default function CreatePurchaseOrderPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  append({ productId: '', productName: '', quantityOrdered: 1, unitCost: 0 });
+                  append({ productId: '', productName: '', quantityOrdered: 1, unitCost: 0, quantityReceived: 0 });
                   setComboboxOpenStates(prev => [...prev, false]);
                 }}
                 className="mt-2"

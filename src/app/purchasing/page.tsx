@@ -1,12 +1,12 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlusCircle, Edit, Trash2, Eye, Filter, Search, MoreHorizontal, PackageCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { PurchaseOrder } from '@/lib/types';
+import type { PurchaseOrder, PurchaseOrderItem } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
@@ -20,7 +20,8 @@ import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useInventoryStore } from '@/store/inventory-store';
 import Link from 'next/link';
-import { mockPurchaseOrders, purchaseOrderStatusColors } from '@/lib/mock-data'; 
+import { purchaseOrderStatusColors } from '@/lib/mock-data'; // Keep this for UI colors
+import { fetchPurchaseOrders, deletePurchaseOrderById, updatePurchaseOrderStatus } from './actions';
 
 export default function PurchasingPage() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
@@ -28,13 +29,23 @@ export default function PurchasingPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { increaseStock, fetchProducts: fetchInventoryProducts } = useInventoryStore();
 
+  const loadPOs = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      await fetchInventoryProducts(); // Ensure products are loaded for stock updates
+      const fetchedPOs = await fetchPurchaseOrders();
+      setPurchaseOrders(fetchedPOs);
+    } catch (error) {
+      toast.error("Failed to load purchase orders.");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchInventoryProducts]);
+
   useEffect(() => {
-    fetchInventoryProducts(); 
-    // Simulate API call or data loading for POs
-    // For now, we directly use the mockPurchaseOrders array, which might be mutated by create/edit pages
-    setPurchaseOrders([...mockPurchaseOrders].sort((a, b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime())); 
-    setIsLoading(false);
-  }, [fetchInventoryProducts]); 
+    loadPOs();
+  }, [loadPOs]);
 
   const filteredPurchaseOrders = purchaseOrders.filter(po =>
     po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -42,27 +53,25 @@ export default function PurchasingPage() {
     po.status.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  const handleDeletePO = (poId: string) => {
-     toast.warning('Are you sure you want to delete this purchase order?', {
+  const handleDeletePO = (poId: string, poNumber: string) => {
+     toast.warning(`Are you sure you want to delete PO "${poNumber}"?`, {
       action: {
         label: 'Delete',
-        onClick: () => {
-          const indexToDelete = mockPurchaseOrders.findIndex(po => po.id === poId);
-          if (indexToDelete > -1) {
-            mockPurchaseOrders.splice(indexToDelete, 1);
+        onClick: async () => {
+          try {
+            await deletePurchaseOrderById(poId);
+            toast.success(`PO "${poNumber}" deleted.`);
+            loadPOs(); // Refresh list
+          } catch (error) {
+            toast.error(`Failed to delete PO "${poNumber}".`);
           }
-          setPurchaseOrders(prev => prev.filter(po => po.id !== poId).sort((a, b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime()));
-          toast.success('Purchase order deleted.');
         },
       },
-      cancel: {
-        label: 'Cancel',
-      }
+      cancel: { label: 'Cancel' }
     });
   }
 
-  const handleReceivePO = async (poId: string) => {
-    const po = purchaseOrders.find(p => p.id === poId);
+  const handleReceivePO = async (po: PurchaseOrder) => {
     if (!po) {
       toast.error("Purchase Order not found.");
       return;
@@ -74,25 +83,18 @@ export default function PurchasingPage() {
     }
 
     try {
+      // Update PO status on server first
+      await updatePurchaseOrderStatus(po.id, 'Received', po.items as PurchaseOrderItem[]);
+      
+      // Then update stock locally (client-side store)
       for (const item of po.items) {
         await increaseStock(item.productId, item.quantityOrdered);
       }
-
-      const updatedPOs = purchaseOrders.map(p =>
-        p.id === poId ? { ...p, status: 'Received', updatedAt: new Date().toISOString() } : p
-      );
-      setPurchaseOrders(updatedPOs.sort((a, b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime()));
       
-      const mockIndex = mockPurchaseOrders.findIndex(p => p.id === poId);
-      if (mockIndex !== -1) {
-        mockPurchaseOrders[mockIndex] = { ...mockPurchaseOrders[mockIndex], status: 'Received', updatedAt: new Date().toISOString()};
-        mockPurchaseOrders[mockIndex].items.forEach(item => {
-            item.quantityReceived = item.quantityOrdered;
-        });
-      }
       toast.success(`Items for PO ${po.poNumber} received and stock updated.`);
+      loadPOs(); // Refresh list
     } catch (error) {
-      toast.error("Failed to update stock. Please check console for errors.");
+      toast.error("Failed to update stock or PO status. Please check console for errors.");
       console.error("Error receiving PO:", error);
     }
   };
@@ -125,7 +127,7 @@ export default function PurchasingPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button variant="outline">
+            <Button variant="outline" disabled> {/* TODO: Implement filter */}
               <Filter className="mr-2 h-4 w-4" />
               Filter by Status
             </Button>
@@ -213,13 +215,13 @@ export default function PurchasingPage() {
                             </Link>
                           </DropdownMenuItem>
                            <DropdownMenuItem
-                            onClick={() => handleReceivePO(po.id)}
+                            onClick={() => handleReceivePO(po)}
                             disabled={['Received', 'Cancelled', 'Closed'].includes(po.status)}
                           >
                             <PackageCheck className="mr-2 h-4 w-4" /> Mark as Received
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleDeletePO(po.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                          <DropdownMenuItem onClick={() => handleDeletePO(po.id, po.poNumber)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                             <Trash2 className="mr-2 h-4 w-4" /> Delete PO
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -235,4 +237,3 @@ export default function PurchasingPage() {
     </div>
   );
 }
-

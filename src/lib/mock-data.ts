@@ -1,81 +1,43 @@
 
-import type { PurchaseOrder } from '@/lib/types';
+import type { PurchaseOrder, PurchaseOrderStatus } from '@/lib/types'; // Updated import
 
-export const mockPurchaseOrders: PurchaseOrder[] = [
+// mockPurchaseOrders is no longer the source of truth for PO data, DB is.
+// This array can be removed or kept for reference/testing if needed, but app won't use it directly.
+export const mockPurchaseOrders_DEPRECATED: PurchaseOrder[] = [
   {
-    id: 'po1',
+    id: 'po1_mock',
     poNumber: 'PO2024-001',
-    supplierId: 'sup1',
+    // supplierId: 'sup1', // No longer in type, supplierName is string
     supplierName: 'Fresh Farms Inc.',
     orderDate: new Date('2024-07-15').toISOString(),
     expectedDeliveryDate: new Date('2024-07-20').toISOString(),
     status: 'Received',
     items: [
-      { productId: '1', productName: 'Organic Apples', quantityOrdered: 50, unitCost: 1.50, totalCost: 75.00, quantityReceived: 50 },
+      { id: 'item1', productId: 'prod_apple', productName: 'Organic Apples', quantityOrdered: 50, unitCost: 1.50, totalCost: 75.00, quantityReceived: 50, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
     ],
     discountAmount: 0,
     shippingCost: 10.00,
     taxes: 5.00,
-    totalAmount: 90.00, // 75 (items) - 0 (discount) + 10 (shipping) + 5 (taxes)
+    totalAmount: 90.00,
     notes: 'Ensure apples are fresh upon delivery.',
-    createdBy: 'user1',
+    createdById: 'user_admin_alice', // Changed from 'user1'
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
   },
-  {
-    id: 'po2',
-    poNumber: 'PO2024-002',
-    supplierId: 'sup2',
-    supplierName: 'Artisan Bakers Co.',
-    orderDate: new Date('2024-07-18').toISOString(),
-    expectedDeliveryDate: new Date('2024-07-25').toISOString(),
-    status: 'Ordered',
-    items: [
-      { productId: '2', productName: 'Whole Wheat Bread', quantityOrdered: 30, unitCost: 2.20, totalCost: 66.00 },
-    ],
-    discountAmount: 5.00,
-    shippingCost: 5.00,
-    taxes: 0.00,
-    totalAmount: 66.00, // 66 (items) - 5 (discount) + 5 (shipping)
-    notes: '',
-    createdBy: 'user1',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-  },
-  {
-    id: 'po3',
-    poNumber: 'PO2024-003',
-    supplierId: 'sup1',
-    supplierName: 'Fresh Farms Inc.',
-    orderDate: new Date('2024-07-20').toISOString(),
-    expectedDeliveryDate: new Date('2024-07-28').toISOString(),
-    status: 'Pending Approval',
-    items: [
-      { productId: '1', productName: 'Organic Apples', quantityOrdered: 20, unitCost: 1.50, totalCost: 30.00 },
-      { productId: '3', productName: 'Free-Range Eggs (Dozen)', quantityOrdered: 10, unitCost: 3.00, totalCost: 30.00 },
-    ],
-    discountAmount: 0,
-    shippingCost: 7.50,
-    taxes: 2.50,
-    totalAmount: 70.00, // 60 (items) - 0 (discount) + 7.5 (shipping) + 2.5 (taxes)
-    notes: 'Handle eggs with care.',
-    createdBy: 'user1',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
-  },
+  // ... other mock POs if needed for reference
 ];
 
-export const purchaseOrderStatusOptions: PurchaseOrder['status'][] = [
-  'Draft', 'Pending Approval', 'Approved', 'Ordered', 'Shipped', 'Partially Received', 'Received', 'Cancelled', 'Closed'
+export const purchaseOrderStatusOptions: PurchaseOrderStatus[] = [
+  'Draft', 'PendingApproval', 'Approved', 'Ordered', 'Shipped', 'PartiallyReceived', 'Received', 'Cancelled', 'Closed'
 ];
 
-export const purchaseOrderStatusColors: Record<PurchaseOrder['status'], string> = {
+export const purchaseOrderStatusColors: Record<PurchaseOrderStatus, string> = {
   'Draft': 'bg-gray-200 text-gray-700',
-  'Pending Approval': 'bg-yellow-200 text-yellow-800',
+  'PendingApproval': 'bg-yellow-200 text-yellow-800',
   'Approved': 'bg-blue-200 text-blue-800',
   'Ordered': 'bg-indigo-200 text-indigo-800',
   'Shipped': 'bg-purple-200 text-purple-800',
-  'Partially Received': 'bg-orange-200 text-orange-800',
+  'PartiallyReceived': 'bg-orange-200 text-orange-800',
   'Received': 'bg-green-200 text-green-800',
   'Cancelled': 'bg-red-200 text-red-800',
   'Closed': 'bg-gray-400 text-gray-900',

@@ -6,14 +6,14 @@ export interface Product {
   category: string;
   quantity: number;
   price: number;
-  costPrice?: number | null; // Prisma Float? maps to number | null
+  costPrice?: number | null;
   supplier?: string | null;
   description?: string | null;
   imageUrl?: string | null;
-  tags?: string[]; // Will be stringified JSON in DB, parsed in app
+  tags?: string[]; 
   lowStockThreshold?: number | null;
-  createdAt: string; // ISO date string from Prisma
-  updatedAt: string; // ISO date string from Prisma
+  createdAt: string; 
+  updatedAt: string; 
 }
 
 export interface CartItem {
@@ -28,13 +28,13 @@ export interface PurchaseOrder {
   id:string;
   poNumber: string;
   supplierId: string;
-  supplierName: string; // Denormalized for display
-  orderDate: string; // ISO date string
-  expectedDeliveryDate?: string; // ISO date string
+  supplierName: string; 
+  orderDate: string; 
+  expectedDeliveryDate?: string; 
   status: 'Draft' | 'Pending Approval' | 'Approved' | 'Ordered' | 'Shipped' | 'Partially Received' | 'Received' | 'Cancelled' | 'Closed';
   items: Array<{
     productId: string;
-    productName: string; // Denormalized
+    productName: string; 
     quantityOrdered: number;
     quantityReceived?: number;
     unitCost: number;
@@ -45,20 +45,28 @@ export interface PurchaseOrder {
   taxes?: number;
   totalAmount: number;
   notes?: string;
-  createdBy: string; // User ID
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  createdBy: string; 
+  createdAt: string; 
+  updatedAt: string; 
+}
+
+// Matches Prisma Role Enum
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  MANAGER = 'MANAGER',
+  STAFF = 'STAFF',
 }
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'Admin' | 'Manager' | 'Staff';
-  avatarUrl?: string;
+  role: UserRole; // Use the enum
+  avatarUrl?: string | null;
   isActive: boolean;
-  lastLogin?: string; // ISO date string
+  lastLogin?: string | null; // ISO date string or null
   createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
 }
 
 export interface Supplier {
@@ -69,6 +77,6 @@ export interface Supplier {
   phone?: string;
   address?: string;
   notes?: string;
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  createdAt: string; 
+  updatedAt: string; 
 }

@@ -1,12 +1,15 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Role } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log(`Start seeding ...`);
 
-  await prisma.product.deleteMany(); // Clear existing products
+  // Clear existing products and users
+  await prisma.user.deleteMany();
+  await prisma.product.deleteMany();
 
+  // Seed Products
   const productsToCreate = [
     {
       name: 'Organic Apples',
@@ -79,8 +82,50 @@ async function main() {
     const product = await prisma.product.create({
       data: p,
     });
-    console.log(`Created product with id: ${product.id}`);
+    console.log(`Created product with id: ${product.id} (${product.name})`);
   }
+
+  // Seed Users
+  const usersToCreate = [
+    {
+      name: 'Alice Wonderland',
+      email: 'alice@stockpilot.com',
+      role: Role.ADMIN,
+      avatarUrl: 'https://placehold.co/100x100/E91E63/FFFFFF.png?text=AW',
+      isActive: true,
+      lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+    },
+    {
+      name: 'Bob The Builder',
+      email: 'bob@stockpilot.com',
+      role: Role.MANAGER,
+      avatarUrl: 'https://placehold.co/100x100/FFC107/000000.png?text=BB',
+      isActive: true,
+      lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
+    },
+    {
+      name: 'Charlie Brown',
+      email: 'charlie@stockpilot.com',
+      role: Role.STAFF,
+      avatarUrl: 'https://placehold.co/100x100/4CAF50/FFFFFF.png?text=CB',
+      isActive: false,
+    },
+    {
+      name: 'Diana Prince',
+      email: 'diana@stockpilot.com',
+      role: Role.STAFF,
+      isActive: true,
+      lastLogin: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
+    },
+  ];
+
+  for (const u of usersToCreate) {
+    const user = await prisma.user.create({
+      data: u,
+    });
+    console.log(`Created user with id: ${user.id} (${user.name})`);
+  }
+
   console.log(`Seeding finished.`);
 }
 

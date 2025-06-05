@@ -7,10 +7,28 @@ async function main() {
   console.log(`Start seeding ...`);
 
   // Clear existing data in reverse order of dependency
+  await prisma.appSettings.deleteMany(); // Clear settings first
   await prisma.purchaseOrderItem.deleteMany();
   await prisma.purchaseOrder.deleteMany();
   await prisma.user.deleteMany();
   await prisma.product.deleteMany();
+
+  // Seed AppSettings (ensure only one record)
+  await prisma.appSettings.upsert({
+    where: { id: 'main_settings' },
+    update: {}, // No specific updates if it exists, just ensure it's there
+    create: {
+      id: 'main_settings', // Fixed ID
+      appName: "StockPilot HQ",
+      dateFormat: "yyyy-MM-dd",
+      timeZone: "Europe/London",
+      defaultCurrency: "GBP",
+      emailNotifications: true,
+      lowStockAlerts: true,
+      newOrderAlerts: true,
+    },
+  });
+  console.log(`Created/ensured main app settings.`);
 
   // Seed Products
   const productsToCreate = [
@@ -76,6 +94,7 @@ async function main() {
         orderDate: new Date('2024-07-15T10:00:00Z'),
         expectedDeliveryDate: new Date('2024-07-20T10:00:00Z'),
         status: PurchaseOrderStatus.Received,
+        discountAmount: 0,
         shippingCost: 10.00,
         taxes: 5.00,
         totalAmount: 90.00, // 75 (items) + 10 (shipping) + 5 (taxes)

@@ -1,5 +1,5 @@
 
-import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, Role as PrismaRole, PurchaseOrderStatus as PrismaPurchaseOrderStatus } from '@prisma/client';
+import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, Role as PrismaRole, PurchaseOrderStatus as PrismaPurchaseOrderStatus, AppSettings as PrismaAppSettings } from '@prisma/client';
 
 export interface Product {
   id: string;
@@ -85,4 +85,9 @@ export interface Supplier {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AppSettings extends Omit<PrismaAppSettings, 'createdAt' | 'updatedAt'> {
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
 }

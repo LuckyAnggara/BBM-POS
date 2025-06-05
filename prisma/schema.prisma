@@ -9,34 +9,22 @@ generator client {
 }
 
 model Product {
-  id                 String  @id @default(cuid())
-  name               String
-  sku                String  @unique
-  category           String
-  quantity           Int
-  price              Float
-  costPrice          Float?
-  supplier           String?
-  description        String?
-  imageUrl           String?
-  tags               String? // Store as JSON string
-  lowStockThreshold  Int?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  purchaseOrderItems PurchaseOrderItem[]
-}
+  id                String   @id @default(cuid())
+  name              String
+  sku               String   @unique
+  category          String
+  quantity          Int
+  price             Float
+  costPrice         Float?
+  supplier          String?
+  description       String?
+  imageUrl          String?
+  tags              String? // Stored as JSON string e.g. ["organic", "fruit"]
+  lowStockThreshold Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-model User {
-  id              String   @id @default(cuid())
-  name            String
-  email           String   @unique
-  role            Role
-  avatarUrl       String?
-  isActive        Boolean  @default(true)
-  lastLogin       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  purchaseOrders  PurchaseOrder[]
+  purchaseOrderItems PurchaseOrderItem[]
 }
 
 enum Role {
@@ -45,45 +33,18 @@ enum Role {
   STAFF
 }
 
-model PurchaseOrder {
-  id                    String   @id @default(cuid())
-  poNumber              String   @unique
-  supplierName          String
-  orderDate             DateTime
-  expectedDeliveryDate  DateTime?
-  status                PurchaseOrderStatus
-  discountAmount        Float?
-  shippingCost          Float?
-  taxes                 Float?
-  totalAmount           Float
-  notes                 String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+model User {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  role        Role     @default(STAFF)
+  avatarUrl   String?
+  isActive    Boolean  @default(true)
+  lastLogin   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  createdById String
-  createdBy   User   @relation(fields: [createdById], references: [id])
-
-  items PurchaseOrderItem[]
-}
-
-model PurchaseOrderItem {
-  id                String   @id @default(cuid())
-  quantityOrdered   Int
-  quantityReceived  Int?
-  unitCost          Float
-  totalCost         Float // Calculated: quantityOrdered * unitCost
-  productName       String   // Denormalized product name at time of order
-
-  purchaseOrderId String
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([purchaseOrderId, productId]) // Ensure a product is listed only once per PO
+  purchaseOrders PurchaseOrder[] @relation("CreatedBy")
 }
 
 enum PurchaseOrderStatus {
@@ -96,4 +57,56 @@ enum PurchaseOrderStatus {
   Received
   Cancelled
   Closed
+}
+
+model PurchaseOrder {
+  id                   String              @id @default(cuid())
+  poNumber             String              @unique
+  supplierName         String
+  orderDate            DateTime
+  expectedDeliveryDate DateTime?
+  status               PurchaseOrderStatus @default(Draft)
+  items                PurchaseOrderItem[]
+  discountAmount       Float?
+  shippingCost         Float?
+  taxes                Float?
+  totalAmount          Float
+  notes                String?
+  createdById          String
+  createdBy            User                @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([createdById])
+}
+
+model PurchaseOrderItem {
+  id                String   @id @default(cuid())
+  purchaseOrderId   String
+  purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId         String
+  productName       String // Denormalized for easier display
+  product           Product  @relation(fields: [productId], references: [id])
+  quantityOrdered   Int
+  quantityReceived  Int?
+  unitCost          Float
+  totalCost         Float    // quantityOrdered * unitCost
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+}
+
+model AppSettings {
+  id                 String   @id @default("main_settings") // Use a fixed ID for singleton
+  appName            String   @default("StockPilot")
+  dateFormat         String   @default("MM/dd/yyyy")
+  timeZone           String   @default("America/New_York")
+  defaultCurrency    String   @default("USD")
+  emailNotifications Boolean  @default(true)
+  lowStockAlerts     Boolean  @default(true)
+  newOrderAlerts     Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }

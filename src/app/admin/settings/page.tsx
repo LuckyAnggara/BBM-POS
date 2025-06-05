@@ -1,11 +1,12 @@
+
 'use client';
+import { useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Bell, Building, Palette, ShieldCheck } from "lucide-react";
+import { Save, Bell, Building, Palette, ShieldCheck, Loader2 } from "lucide-react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -26,6 +27,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { fetchAppSettings, saveAppSettings } from './actions';
+import type { AppSettings } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 const generalSettingsSchema = z.object({
   appName: z.string().min(1, "Application name is required"),
@@ -48,33 +53,70 @@ type NotificationSettingsValues = z.infer<typeof notificationSettingsSchema>;
 export default function SettingsPage() {
   const generalForm = useForm<GeneralSettingsValues>({
     resolver: zodResolver(generalSettingsSchema),
-    defaultValues: {
-      appName: "StockPilot",
-      dateFormat: "MM/dd/yyyy",
-      timeZone: "America/New_York",
-      defaultCurrency: "USD",
-    },
+    // Default values will be loaded from DB
   });
 
   const notificationForm = useForm<NotificationSettingsValues>({
     resolver: zodResolver(notificationSettingsSchema),
-    defaultValues: {
-      emailNotifications: true,
-      lowStockAlerts: true,
-      newOrderAlerts: false,
-    },
+    // Default values will be loaded from DB
   });
 
-  const onGeneralSubmit: SubmitHandler<GeneralSettingsValues> = (data) => {
-    console.log("General Settings Data:", data);
-    toast.success("General settings saved successfully!");
+  useEffect(() => {
+    async function loadSettings() {
+      generalForm.control._setFormState({ isLoading: true });
+      notificationForm.control._setFormState({ isLoading: true });
+      try {
+        const settings = await fetchAppSettings();
+        generalForm.reset({
+          appName: settings.appName,
+          dateFormat: settings.dateFormat,
+          timeZone: settings.timeZone,
+          defaultCurrency: settings.defaultCurrency,
+        });
+        notificationForm.reset({
+          emailNotifications: settings.emailNotifications,
+          lowStockAlerts: settings.lowStockAlerts,
+          newOrderAlerts: settings.newOrderAlerts,
+        });
+      } catch (error) {
+        toast.error("Failed to load settings.");
+        console.error(error);
+      } finally {
+        generalForm.control._setFormState({ isLoading: false });
+        notificationForm.control._setFormState({ isLoading: false });
+      }
+    }
+    loadSettings();
+  }, [generalForm, notificationForm]);
+
+  const onGeneralSubmit: SubmitHandler<GeneralSettingsValues> = async (data) => {
+    generalForm.control._setFormState({ isSubmitting: true });
+    try {
+      await saveAppSettings(data);
+      toast.success("General settings saved successfully!");
+    } catch (error) {
+      toast.error("Failed to save general settings.");
+    } finally {
+      generalForm.control._setFormState({ isSubmitting: false });
+    }
   };
   
-  const onNotificationSubmit: SubmitHandler<NotificationSettingsValues> = (data) => {
-    console.log("Notification Settings Data:", data);
-    toast.success("Notification settings saved successfully!");
+  const onNotificationSubmit: SubmitHandler<NotificationSettingsValues> = async (data) => {
+    notificationForm.control._setFormState({ isSubmitting: true });
+    try {
+      await saveAppSettings(data);
+      toast.success("Notification settings saved successfully!");
+    } catch (error) {
+       toast.error("Failed to save notification settings.");
+    } finally {
+      notificationForm.control._setFormState({ isSubmitting: false });
+    }
   };
-
+  
+  const isGeneralLoading = generalForm.formState.isLoading;
+  const isNotificationLoading = notificationForm.formState.isLoading;
+  const isGeneralSubmitting = generalForm.formState.isSubmitting;
+  const isNotificationSubmitting = notificationForm.formState.isSubmitting;
 
   return (
     <Card>
@@ -98,6 +140,15 @@ export default function SettingsPage() {
                 <CardDescription>Basic application settings.</CardDescription>
               </CardHeader>
               <CardContent>
+                {isGeneralLoading ? (
+                  <div className="space-y-6">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-1/2" />
+                    <Skeleton className="h-10 w-48" />
+                  </div>
+                ) : (
                 <Form {...generalForm}>
                   <form onSubmit={generalForm.handleSubmit(onGeneralSubmit)} className="space-y-6">
                     <FormField
@@ -119,7 +170,7 @@ export default function SettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Date Format</FormLabel>
-                           <Select onValueChange={field.onChange} defaultValue={field.value}>
+                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select a date format" />
@@ -141,7 +192,7 @@ export default function SettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Time Zone</FormLabel>
-                           <Select onValueChange={field.onChange} defaultValue={field.value}>
+                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select a time zone" />
@@ -172,11 +223,13 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="mt-4">
-                      <Save className="mr-2 h-4 w-4" /> Save General Settings
+                    <Button type="submit" className="mt-4" disabled={isGeneralSubmitting || isGeneralLoading}>
+                      {isGeneralSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      {isGeneralSubmitting ? 'Saving...' : 'Save General Settings'}
                     </Button>
                   </form>
                 </Form>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -188,6 +241,14 @@ export default function SettingsPage() {
                 <CardDescription>Manage how you receive notifications.</CardDescription>
               </CardHeader>
               <CardContent>
+                {isNotificationLoading ? (
+                    <div className="space-y-6">
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-10 w-56" />
+                    </div>
+                ) : (
                  <Form {...notificationForm}>
                   <form onSubmit={notificationForm.handleSubmit(onNotificationSubmit)} className="space-y-6">
                     <FormField
@@ -235,11 +296,13 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="mt-4">
-                      <Save className="mr-2 h-4 w-4" /> Save Notification Settings
+                    <Button type="submit" className="mt-4" disabled={isNotificationSubmitting || isNotificationLoading}>
+                       {isNotificationSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                       {isNotificationSubmitting ? 'Saving...' : 'Save Notification Settings'}
                     </Button>
                   </form>
                 </Form>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

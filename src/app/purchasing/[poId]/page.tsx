@@ -9,7 +9,7 @@ import { useInventoryStore } from '@/store/inventory-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Edit, CalendarDays, Hash, User, ShoppingBag, AlertTriangle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit, CalendarDays, Hash, User, ShoppingBag, AlertTriangle, Loader2, MessageSquare, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
@@ -32,7 +32,7 @@ export default function PurchaseOrderDetailPage() {
       const foundPO = mockPurchaseOrders.find(p => p.id === poId);
       setPurchaseOrder(foundPO || null);
     }
-  }, [poId]);
+  }, [poId]); // Refetch PO if poId changes (e.g., navigating between PO details)
 
   const getProductSku = (productId: string): string => {
     const product = inventoryProducts.find(p => p.id === productId);
@@ -58,7 +58,7 @@ export default function PurchaseOrderDetailPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
-            <Skeleton className="h-40 w-full rounded-md" /> {/* Item table skeleton */}
+            <Skeleton className="h-40 w-full rounded-md" /> 
           </CardContent>
           <CardFooter className="border-t pt-4 flex justify-end">
             <Skeleton className="h-10 w-24" />
@@ -82,6 +82,8 @@ export default function PurchaseOrderDetailPage() {
       </div>
     );
   }
+  
+  const subtotal = purchaseOrder.items.reduce((sum, item) => sum + item.totalCost, 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -170,13 +172,17 @@ export default function PurchaseOrderDetailPage() {
           
           {purchaseOrder.notes && (
             <div>
-              <h3 className="text-lg font-semibold mb-1 font-headline">Notes</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{purchaseOrder.notes}</p>
+              <h3 className="text-lg font-semibold mb-1 font-headline flex items-center gap-2"><Info className="h-4 w-4"/>Notes</h3>
+              <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md whitespace-pre-wrap">{purchaseOrder.notes}</p>
             </div>
           )}
 
         </CardContent>
         <CardFooter className="border-t bg-muted/30 p-6 flex flex-col items-end gap-2">
+            <div className="text-right">
+                <p className="text-sm text-muted-foreground">Items Subtotal</p>
+                <p className="text-lg font-semibold">${subtotal.toFixed(2)}</p>
+            </div>
             <div className="text-right">
                 <p className="text-sm text-muted-foreground">Shipping Cost</p>
                 <p className="text-lg font-semibold">${(purchaseOrder.shippingCost || 0).toFixed(2)}</p>
@@ -185,7 +191,8 @@ export default function PurchaseOrderDetailPage() {
                 <p className="text-sm text-muted-foreground">Taxes</p>
                 <p className="text-lg font-semibold">${(purchaseOrder.taxes || 0).toFixed(2)}</p>
             </div>
-            <div className="text-right mt-2">
+            <div className="border-t w-full my-2 border-border"></div>
+            <div className="text-right mt-1">
                 <p className="text-sm text-muted-foreground">Grand Total</p>
                 <p className="text-2xl font-bold font-headline">${purchaseOrder.totalAmount.toFixed(2)}</p>
             </div>

@@ -15,6 +15,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -51,6 +52,9 @@ const purchaseOrderSchema = z.object({
   orderDate: z.date({ required_error: "Order date is required." }),
   expectedDeliveryDate: z.date().optional(),
   items: z.array(purchaseOrderItemSchema).min(1, "At least one item is required in the purchase order."),
+  shippingCost: z.coerce.number().min(0, "Shipping cost must be non-negative").optional().or(z.literal('')),
+  taxes: z.coerce.number().min(0, "Taxes must be non-negative").optional().or(z.literal('')),
+  notes: z.string().optional(),
 });
 
 export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
@@ -59,10 +63,7 @@ export default function CreatePurchaseOrderPage() {
   const router = useRouter();
   const { products: inventoryProducts, fetchProducts, isLoading: inventoryLoading } = useInventoryStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // State for managing combobox open states, one for each item row
   const [comboboxOpenStates, setComboboxOpenStates] = useState<boolean[]>([]);
-
 
   useEffect(() => {
     fetchProducts();
@@ -76,6 +77,9 @@ export default function CreatePurchaseOrderPage() {
       orderDate: new Date(),
       expectedDeliveryDate: undefined,
       items: [{ productId: '', productName: '', quantityOrdered: 1, unitCost: 0 }],
+      shippingCost: '',
+      taxes: '',
+      notes: '',
     },
   });
 
@@ -87,20 +91,23 @@ export default function CreatePurchaseOrderPage() {
   useEffect(() => {
     setComboboxOpenStates(fields.map(() => false));
   }, [fields.length]);
-
-  const toggleCombobox = (index: number) => {
-    setComboboxOpenStates(prev => prev.map((state, i) => i === index ? !state : false));
-  };
   
   const setComboboxState = (index: number, isOpen: boolean) => {
     setComboboxOpenStates(prev => prev.map((state, i) => (i === index ? isOpen : state)));
   };
 
+  const calculateSubtotal = (items: PurchaseOrderItemFormValues[]): number => {
+    return items.reduce((sum, item) => sum + ((item.quantityOrdered || 0) * (item.unitCost || 0)), 0);
+  };
 
   const onSubmit = async (data: PurchaseOrderFormValues) => {
     setIsSubmitting(true);
     try {
-      const totalAmount = data.items.reduce((sum, item) => sum + (item.quantityOrdered * item.unitCost), 0);
+      const subtotal = calculateSubtotal(data.items);
+      const shipping = data.shippingCost ? Number(data.shippingCost) : 0;
+      const taxAmount = data.taxes ? Number(data.taxes) : 0;
+      const totalAmount = subtotal + shipping + taxAmount;
+
       const newPO: PurchaseOrder = {
         id: `po${Date.now()}`, 
         poNumber: data.poNumber,
@@ -113,7 +120,10 @@ export default function CreatePurchaseOrderPage() {
           ...item,
           totalCost: item.quantityOrdered * item.unitCost,
         })),
+        shippingCost: shipping,
+        taxes: taxAmount,
         totalAmount,
+        notes: data.notes,
         createdBy: 'user-placeholder', 
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -131,6 +141,14 @@ export default function CreatePurchaseOrderPage() {
   };
   
   const watchedItems = form.watch("items");
+  const watchedShippingCost = form.watch("shippingCost");
+  const watchedTaxes = form.watch("taxes");
+
+  const currentSubtotal = calculateSubtotal(watchedItems);
+  const currentShipping = Number(watchedShippingCost) || 0;
+  const currentTaxes = Number(watchedTaxes) || 0;
+  const currentGrandTotal = currentSubtotal + currentShipping + currentTaxes;
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -287,7 +305,7 @@ export default function CreatePurchaseOrderPage() {
                                         if (product.costPrice) {
                                           form.setValue(`items.${index}.unitCost`, product.costPrice);
                                         } else {
-                                          form.setValue(`items.${index}.unitCost`, 0); // Default if no cost price
+                                          form.setValue(`items.${index}.unitCost`, 0); 
                                         }
                                         setComboboxState(index, false);
                                       }}
@@ -371,20 +389,68 @@ export default function CreatePurchaseOrderPage() {
                  <p className="text-sm font-medium text-destructive">{form.formState.errors.items.message}</p>
               )}
             </CardContent>
-             <CardFooter className="flex justify-between items-center border-t pt-4 mt-4">
-                <div>
-                    <p className="text-sm text-muted-foreground">Grand Total</p>
-                    <p className="text-xl font-bold font-headline">
-                        ${form.getValues('items').reduce((sum, item) => sum + ((item.quantityOrdered || 0) * (item.unitCost || 0)), 0).toFixed(2)}
-                    </p>
+            <CardFooter className="flex flex-col md:flex-row justify-between items-start gap-6 border-t pt-6 mt-4">
+                <div className="w-full md:w-1/2 space-y-4">
+                     <FormField
+                        control={form.control}
+                        name="shippingCost"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Shipping Cost (Optional)</FormLabel>
+                            <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="taxes"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Taxes (Optional)</FormLabel>
+                            <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Notes (Optional)</FormLabel>
+                            <FormControl><Textarea placeholder="Internal notes for this PO..." {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
                 </div>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>Cancel</Button>
-                <Button type="submit" disabled={isSubmitting || inventoryLoading}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  {isSubmitting ? 'Saving...' : 'Save Purchase Order'}
-                </Button>
-              </div>
+                <div className="w-full md:w-auto flex flex-col items-end gap-2 self-end md:self-start">
+                    <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Subtotal</p>
+                        <p className="text-lg font-semibold">${currentSubtotal.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Shipping</p>
+                        <p className="text-lg font-semibold">${currentShipping.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Taxes</p>
+                        <p className="text-lg font-semibold">${currentTaxes.toFixed(2)}</p>
+                    </div>
+                    <div className="border-t w-full my-2"></div>
+                    <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Grand Total</p>
+                        <p className="text-2xl font-bold font-headline">${currentGrandTotal.toFixed(2)}</p>
+                    </div>
+                    <div className="flex gap-2 mt-4 w-full md:w-auto">
+                        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting} className="flex-grow md:flex-grow-0">Cancel</Button>
+                        <Button type="submit" disabled={isSubmitting || inventoryLoading} className="flex-grow md:flex-grow-0">
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        {isSubmitting ? 'Saving...' : 'Save Purchase Order'}
+                        </Button>
+                    </div>
+                </div>
             </CardFooter>
           </Card>
         </form>
@@ -392,4 +458,3 @@ export default function CreatePurchaseOrderPage() {
     </div>
   );
 }
-

@@ -41,7 +41,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const purchaseOrderItemSchema = z.object({
   productId: z.string().min(1, "Product selection is required"),
-  productName: z.string(), // Will be auto-filled, not directly user input in form
+  productName: z.string(), 
   quantityOrdered: z.coerce.number().int().min(1, "Quantity must be at least 1"),
   unitCost: z.coerce.number().min(0, "Unit cost must be non-negative"),
 });
@@ -54,8 +54,9 @@ const purchaseOrderSchema = z.object({
   orderDate: z.date({ required_error: "Order date is required." }),
   expectedDeliveryDate: z.date().optional(),
   items: z.array(purchaseOrderItemSchema).min(1, "At least one item is required."),
+  shippingCost: z.coerce.number().min(0, "Shipping cost must be non-negative").optional().or(z.literal('')),
+  taxes: z.coerce.number().min(0, "Taxes must be non-negative").optional().or(z.literal('')),
   notes: z.string().optional(),
-  // status: z.enum(['Draft', 'Pending Approval', 'Approved', 'Ordered', 'Shipped', 'Partially Received', 'Received', 'Cancelled', 'Closed']), // If status is editable
 });
 
 export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
@@ -81,6 +82,8 @@ export default function EditPurchaseOrderPage() {
       supplierName: '',
       orderDate: new Date(),
       items: [{ productId: '', productName: '', quantityOrdered: 1, unitCost: 0 }],
+      shippingCost: '',
+      taxes: '',
       notes: '',
     },
   });
@@ -106,15 +109,15 @@ export default function EditPurchaseOrderPage() {
             quantityOrdered: item.quantityOrdered,
             unitCost: item.unitCost,
           })),
+          shippingCost: foundPO.shippingCost ?? '',
+          taxes: foundPO.taxes ?? '',
           notes: foundPO.notes || '',
-          // status: foundPO.status, // if status becomes editable
         });
       }
     }
-  }, [poId, form, fetchProducts]);
+  }, [poId, form, fetchProducts]); // Removed inventoryProducts from dep array as it caused reset issues
 
    useEffect(() => {
-    // Initialize combobox states based on the number of items
     setComboboxOpenStates(fields.map(() => false));
   }, [fields.length]);
 
@@ -122,15 +125,21 @@ export default function EditPurchaseOrderPage() {
     setComboboxOpenStates(prev => prev.map((state, i) => (i === index ? isOpen : state)));
   };
 
+  const calculateSubtotal = (items: PurchaseOrderItemFormValues[]): number => {
+    return items.reduce((sum, item) => sum + ((item.quantityOrdered || 0) * (item.unitCost || 0)), 0);
+  };
 
   const onSubmit = async (data: PurchaseOrderFormValues) => {
     if (!existingPO) return;
     setIsSubmitting(true);
     try {
-      const totalAmount = data.items.reduce((sum, item) => sum + (item.quantityOrdered * item.unitCost), 0);
+      const subtotal = calculateSubtotal(data.items);
+      const shipping = data.shippingCost !== '' && data.shippingCost !== undefined ? Number(data.shippingCost) : 0;
+      const taxAmount = data.taxes !== '' && data.taxes !== undefined ? Number(data.taxes) : 0;
+      const totalAmount = subtotal + shipping + taxAmount;
       
       const updatedPOData: Partial<PurchaseOrder> = {
-        ...existingPO, // Preserve fields like id, createdBy, createdAt, status (unless status is made editable)
+        ...existingPO, 
         poNumber: data.poNumber,
         supplierName: data.supplierName,
         orderDate: data.orderDate.toISOString(),
@@ -138,10 +147,11 @@ export default function EditPurchaseOrderPage() {
         items: data.items.map(item => ({
           ...item,
           totalCost: item.quantityOrdered * item.unitCost,
-          // quantityReceived might need specific handling if status changes
         })),
+        shippingCost: shipping,
+        taxes: taxAmount,
         notes: data.notes,
-        totalAmount, // Recalculate total amount
+        totalAmount, 
         updatedAt: new Date().toISOString(),
       };
 
@@ -161,6 +171,13 @@ export default function EditPurchaseOrderPage() {
   };
 
   const watchedItems = form.watch("items");
+  const watchedShippingCost = form.watch("shippingCost");
+  const watchedTaxes = form.watch("taxes");
+
+  const currentSubtotal = calculateSubtotal(watchedItems);
+  const currentShipping = Number(watchedShippingCost) || 0;
+  const currentTaxes = Number(watchedTaxes) || 0;
+  const currentGrandTotal = currentSubtotal + currentShipping + currentTaxes;
 
   if (existingPO === undefined || inventoryLoading) {
     return (
@@ -192,7 +209,6 @@ export default function EditPurchaseOrderPage() {
       </div>
     );
   }
-
 
   return (
     <div className="flex flex-col gap-6">
@@ -394,19 +410,41 @@ export default function EditPurchaseOrderPage() {
                 size="sm"
                 onClick={() => {
                      append({ productId: '', productName: '', quantityOrdered: 1, unitCost: 0 });
-                     setComboboxOpenStates(prev => [...prev, false]); // Add new state for the new combobox
+                     setComboboxOpenStates(prev => [...prev, false]); 
                 }}
                 className="mt-2"
               >
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Item
               </Button>
-               {form.formState.errors.items && !form.formState.errors.items.length && ( // For top-level array errors like minLength
+               {form.formState.errors.items && !form.formState.errors.items.length && ( 
                  <p className="text-sm font-medium text-destructive">{form.formState.errors.items.message}</p>
               )}
             </CardContent>
-             <CardFooter className="border-t pt-4 mt-4">
-                <div className="flex-grow">
-                    <FormField
+             <CardFooter className="flex flex-col md:flex-row justify-between items-start gap-6 border-t pt-6 mt-4">
+                <div className="w-full md:w-1/2 space-y-4">
+                     <FormField
+                        control={form.control}
+                        name="shippingCost"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Shipping Cost (Optional)</FormLabel>
+                            <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="taxes"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Taxes (Optional)</FormLabel>
+                            <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                     <FormField
                         control={form.control}
                         name="notes"
                         render={({ field }) => (
@@ -418,16 +456,27 @@ export default function EditPurchaseOrderPage() {
                         )}
                     />
                 </div>
-                <div className="flex flex-col items-end gap-2 pl-8">
-                     <div>
-                        <p className="text-sm text-muted-foreground">Grand Total</p>
-                        <p className="text-xl font-bold font-headline">
-                            ${form.getValues('items').reduce((sum, item) => sum + ((item.quantityOrdered || 0) * (item.unitCost || 0)), 0).toFixed(2)}
-                        </p>
+                 <div className="w-full md:w-auto flex flex-col items-end gap-2 self-end md:self-start">
+                    <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Subtotal</p>
+                        <p className="text-lg font-semibold">${currentSubtotal.toFixed(2)}</p>
                     </div>
-                    <div className="flex gap-2 mt-2">
-                        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>Cancel</Button>
-                        <Button type="submit" disabled={isSubmitting || inventoryLoading}>
+                    <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Shipping</p>
+                        <p className="text-lg font-semibold">${currentShipping.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Taxes</p>
+                        <p className="text-lg font-semibold">${currentTaxes.toFixed(2)}</p>
+                    </div>
+                    <div className="border-t w-full my-2"></div>
+                    <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Grand Total</p>
+                        <p className="text-2xl font-bold font-headline">${currentGrandTotal.toFixed(2)}</p>
+                    </div>
+                    <div className="flex gap-2 mt-4 w-full md:w-auto">
+                        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting} className="flex-grow md:flex-grow-0">Cancel</Button>
+                        <Button type="submit" disabled={isSubmitting || inventoryLoading} className="flex-grow md:flex-grow-0">
                         {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         {isSubmitting ? 'Saving...' : 'Save Changes'}
                         </Button>
@@ -440,4 +489,3 @@ export default function EditPurchaseOrderPage() {
     </div>
   );
 }
-

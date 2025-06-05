@@ -21,9 +21,9 @@ import {
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AddProductDialog } from '@/components/inventory/add-product-dialog';
+import Link from 'next/link';
 
-// Moved ProductCard to top-level for better practice, passing onDeleteClick
+
 const ProductCardItem = ({ product, onDeleteClick }: { product: Product; onDeleteClick: (productId: string) => void }) => (
   <Card className="flex flex-col">
     <CardHeader className="p-4">
@@ -67,7 +67,6 @@ export default function InventoryPage() {
   const { products, fetchProducts, isLoading, deleteProduct } = useInventoryStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -99,9 +98,11 @@ export default function InventoryPage() {
           <h1 className="text-3xl font-headline font-semibold">Product Inventory</h1>
           <p className="text-muted-foreground">Manage your products, track stock levels, and view details.</p>
         </div>
-        <Button onClick={() => setIsAddProductDialogOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-        </Button>
+        <Link href="/inventory/add" passHref>
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+          </Button>
+        </Link>
       </div>
 
       <Card>
@@ -258,7 +259,7 @@ export default function InventoryPage() {
           )}
         </CardContent>
       </Card>
-      <AddProductDialog open={isAddProductDialogOpen} onOpenChange={setIsAddProductDialogOpen} />
     </div>
   );
 }
+

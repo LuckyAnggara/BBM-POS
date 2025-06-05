@@ -20,29 +20,26 @@ import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useInventoryStore } from '@/store/inventory-store';
 import Link from 'next/link';
-import { mockPurchaseOrders, purchaseOrderStatusColors } from '@/lib/mock-data'; // Updated import
+import { mockPurchaseOrders, purchaseOrderStatusColors } from '@/lib/mock-data'; 
 
 export default function PurchasingPage() {
-  // Initialize state with the imported mockPurchaseOrders
-  // Note: For changes from other pages (like create) to reflect without a store,
-  // this component might need a way to re-fetch or re-initialize its state.
-  // For now, it will show the initial state + any POs added/deleted directly to the mockPurchaseOrders array
-  // if this page is re-mounted or if we manage to trigger a re-render based on `mockPurchaseOrders` reference.
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { increaseStock, fetchProducts: fetchInventoryProducts } = useInventoryStore();
 
   useEffect(() => {
-    fetchInventoryProducts(); // Ensure inventory products are loaded for stock updates
-    // Set purchaseOrders from the potentially modified mock array
-    setPurchaseOrders([...mockPurchaseOrders]); 
+    fetchInventoryProducts(); 
+    // Simulate API call or data loading for POs
+    // For now, we directly use the mockPurchaseOrders array, which might be mutated by create/edit pages
+    setPurchaseOrders([...mockPurchaseOrders].sort((a, b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime())); 
     setIsLoading(false);
-  }, [fetchInventoryProducts]); // Rerun if fetchInventoryProducts changes, or on mount.
+  }, [fetchInventoryProducts]); 
 
   const filteredPurchaseOrders = purchaseOrders.filter(po =>
     po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    po.supplierName.toLowerCase().includes(searchTerm.toLowerCase())
+    po.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    po.status.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
   const handleDeletePO = (poId: string) => {
@@ -54,7 +51,7 @@ export default function PurchasingPage() {
           if (indexToDelete > -1) {
             mockPurchaseOrders.splice(indexToDelete, 1);
           }
-          setPurchaseOrders(prev => prev.filter(po => po.id !== poId));
+          setPurchaseOrders(prev => prev.filter(po => po.id !== poId).sort((a, b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime()));
           toast.success('Purchase order deleted.');
         },
       },
@@ -84,7 +81,7 @@ export default function PurchasingPage() {
       const updatedPOs = purchaseOrders.map(p =>
         p.id === poId ? { ...p, status: 'Received', updatedAt: new Date().toISOString() } : p
       );
-      setPurchaseOrders(updatedPOs);
+      setPurchaseOrders(updatedPOs.sort((a, b) => parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime()));
       
       const mockIndex = mockPurchaseOrders.findIndex(p => p.id === poId);
       if (mockIndex !== -1) {
@@ -122,7 +119,7 @@ export default function PurchasingPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search by PO number or supplier..."
+                placeholder="Search by PO number, supplier, or status..."
                 className="w-full rounded-lg bg-background pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -130,7 +127,7 @@ export default function PurchasingPage() {
             </div>
             <Button variant="outline">
               <Filter className="mr-2 h-4 w-4" />
-              Filter
+              Filter by Status
             </Button>
           </div>
         </CardHeader>
@@ -172,6 +169,7 @@ export default function PurchasingPage() {
                   <TableHead>PO Number</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Order Date</TableHead>
+                  <TableHead>Expected Delivery</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-center">Actions</TableHead>
@@ -180,9 +178,16 @@ export default function PurchasingPage() {
               <TableBody>
                 {filteredPurchaseOrders.map((po) => (
                   <TableRow key={po.id}>
-                    <TableCell className="font-medium">{po.poNumber}</TableCell>
+                    <TableCell className="font-medium">
+                       <Link href={`/purchasing/${po.id}`} className="hover:underline">
+                        {po.poNumber}
+                       </Link>
+                    </TableCell>
                     <TableCell>{po.supplierName}</TableCell>
                     <TableCell>{format(parseISO(po.orderDate), 'MMM dd, yyyy')}</TableCell>
+                     <TableCell>
+                        {po.expectedDeliveryDate ? format(parseISO(po.expectedDeliveryDate), 'MMM dd, yyyy') : 'N/A'}
+                    </TableCell>
                     <TableCell>
                       <Badge className={`${purchaseOrderStatusColors[po.status] || 'bg-gray-200 text-gray-700'} px-2 py-1 text-xs font-medium rounded-full`}>
                         {po.status}
@@ -192,18 +197,18 @@ export default function PurchasingPage() {
                     <TableCell className="text-center">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
-                             <Link href={`/purchasing/${po.id}`}> {/* Updated Link */}
+                             <Link href={`/purchasing/${po.id}`}>
                                 <Eye className="mr-2 h-4 w-4" /> View Details
                               </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href={`/purchasing/${po.id}/edit`}> {/* Updated Link */}
+                            <Link href={`/purchasing/${po.id}/edit`}>
                               <Edit className="mr-2 h-4 w-4" /> Edit PO
                             </Link>
                           </DropdownMenuItem>
@@ -230,3 +235,4 @@ export default function PurchasingPage() {
     </div>
   );
 }
+

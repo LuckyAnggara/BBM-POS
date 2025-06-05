@@ -4,7 +4,7 @@
 import { prisma } from '@/lib/prisma';
 import type { PurchaseOrder as AppPurchaseOrder, PurchaseOrderItem as AppPurchaseOrderItem, PurchaseOrderStatus } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import type { PurchaseOrderFormValues, PurchaseOrderItemFormValues } from './create/page'; // Assuming types are similar for edit
+import type { PurchaseOrderFormValues } from './create/page'; // Assuming types are similar for edit
 
 // Helper to map Prisma PO to App PO
 const mapPrismaPOToAppPO = (dbPO: any): AppPurchaseOrder => {
@@ -12,6 +12,7 @@ const mapPrismaPOToAppPO = (dbPO: any): AppPurchaseOrder => {
     ...dbPO,
     orderDate: dbPO.orderDate.toISOString(),
     expectedDeliveryDate: dbPO.expectedDeliveryDate?.toISOString() || null,
+    status: dbPO.status as PurchaseOrderStatus, // Status is now string
     createdAt: dbPO.createdAt.toISOString(),
     updatedAt: dbPO.updatedAt.toISOString(),
     items: dbPO.items.map((item: any) => ({
@@ -19,7 +20,6 @@ const mapPrismaPOToAppPO = (dbPO: any): AppPurchaseOrder => {
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString(),
     })),
-    // createdBy is already an object if included, or just createdById if not
   };
 };
 
@@ -29,8 +29,8 @@ export async function fetchPurchaseOrders(): Promise<AppPurchaseOrder[]> {
     const dbPOs = await prisma.purchaseOrder.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        items: { include: { product: true } }, // Include product details in items
-        createdBy: true, // Include user who created it
+        items: { include: { product: true } }, 
+        createdBy: true, 
       },
     });
     return dbPOs.map(mapPrismaPOToAppPO);
@@ -59,7 +59,7 @@ export async function fetchPurchaseOrderById(id: string): Promise<AppPurchaseOrd
 
 export async function createPurchaseOrder(data: PurchaseOrderFormValues, createdById: string): Promise<AppPurchaseOrder> {
   try {
-    const { items, poNumber, supplierName, orderDate, expectedDeliveryDate, discountAmount, shippingCost, taxes, notes } = data;
+    const { items, poNumber, supplierName, orderDate, expectedDeliveryDate, status, discountAmount, shippingCost, taxes, notes } = data;
 
     const subtotal = items.reduce((sum, item) => sum + (item.quantityOrdered * item.unitCost), 0);
     const finalDiscount = discountAmount ? Number(discountAmount) : 0;
@@ -73,7 +73,7 @@ export async function createPurchaseOrder(data: PurchaseOrderFormValues, created
         supplierName,
         orderDate,
         expectedDeliveryDate,
-        status: 'Draft', // Default status
+        status: status || 'Draft', // Default status if not provided, now a string
         discountAmount: finalDiscount,
         shippingCost: finalShipping,
         taxes: finalTaxes,
@@ -83,10 +83,11 @@ export async function createPurchaseOrder(data: PurchaseOrderFormValues, created
         items: {
           create: items.map(item => ({
             productId: item.productId,
-            productName: item.productName, // Assuming productName is passed in form data
+            productName: item.productName,
             quantityOrdered: item.quantityOrdered,
             unitCost: item.unitCost,
             totalCost: item.quantityOrdered * item.unitCost,
+            quantityReceived: item.quantityReceived ?? null,
           })),
         },
       },
@@ -111,25 +112,20 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
     const finalTaxes = taxes ? Number(taxes) : 0;
     const totalAmount = subtotal - finalDiscount + finalShipping + finalTaxes;
     
-    // Transaction to update PO and its items
     const updatedDbPO = await prisma.$transaction(async (tx) => {
-        // Delete existing items for this PO
         await tx.purchaseOrderItem.deleteMany({
             where: { purchaseOrderId: id },
         });
 
-        // Create new items
         const newItemsData = items.map(item => ({
-            purchaseOrderId: id, // This needs to be set if creating items separately
             productId: item.productId,
             productName: item.productName,
             quantityOrdered: item.quantityOrdered,
             unitCost: item.unitCost,
             totalCost: item.quantityOrdered * item.unitCost,
-            quantityReceived: data.items.find(i => i.productId === item.productId)?.quantityReceived || null
+            quantityReceived: item.quantityReceived ?? null,
         }));
         
-        // Update the PurchaseOrder
         const po = await tx.purchaseOrder.update({
             where: { id },
             data: {
@@ -137,7 +133,7 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
                 supplierName,
                 orderDate,
                 expectedDeliveryDate,
-                status, // Status from form
+                status: status as PurchaseOrderStatus, // Status from form, now a string
                 discountAmount: finalDiscount,
                 shippingCost: finalShipping,
                 taxes: finalTaxes,
@@ -146,13 +142,11 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
                 items: {
                     create: newItemsData
                 }
-                // createdById is not changed during update
             },
             include: { items: { include: {product: true} }, createdBy: true },
         });
         return po;
     });
-
 
     revalidatePath('/purchasing');
     revalidatePath(`/purchasing/${id}`);
@@ -166,7 +160,6 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
 
 export async function deletePurchaseOrderById(id: string): Promise<void> {
   try {
-    // Prisma onDelete: Cascade will handle PurchaseOrderItem deletion
     await prisma.purchaseOrder.delete({
       where: { id },
     });
@@ -179,24 +172,20 @@ export async function deletePurchaseOrderById(id: string): Promise<void> {
 
 export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrderStatus, itemsToReceive?: AppPurchaseOrderItem[]): Promise<AppPurchaseOrder> {
   try {
-    const updateData: any = { status };
+    const updateData: any = { status }; // status is now a string
     if (status === 'Received' && itemsToReceive) {
-        // This part is tricky if we also update item's quantityReceived here.
-        // For now, just update PO status. Stock update is client-side.
-        // Or, we can update quantityReceived on items if needed.
-        await prisma.purchaseOrderItem.updateMany({
-            where: { purchaseOrderId: id },
-            data: { quantityReceived: { increment: 0 } } // Placeholder, actual logic might be per item
-        });
-        // This requires a more complex update if items can be partially received.
-        // For a simple "Mark all as Received":
         for (const item of itemsToReceive) {
-            await prisma.purchaseOrderItem.update({
-                where: { id: item.id }, // Assuming item has an id
-                data: { quantityReceived: item.quantityOrdered }
-            });
+             // Ensure item.id is valid and item exists before attempting update
+            if (item.id) {
+                await prisma.purchaseOrderItem.update({
+                    where: { id: item.id }, 
+                    data: { quantityReceived: item.quantityOrdered }
+                });
+            } else {
+                // This case should ideally not happen if itemsToReceive are from an existing PO
+                console.warn(`Item ${item.productName} is missing an ID, cannot update quantityReceived.`);
+            }
         }
-
     }
 
     const updatedDbPO = await prisma.purchaseOrder.update({
@@ -212,4 +201,3 @@ export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrde
     throw new Error('Could not update PO status.');
   }
 }
-

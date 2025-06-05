@@ -9,9 +9,9 @@ generator client {
 }
 
 model Product {
-  id                String   @id @default(cuid())
+  id                String  @id @default(cuid())
   name              String
-  sku               String   @unique
+  sku               String  @unique
   category          String
   quantity          Int
   price             Float
@@ -19,7 +19,7 @@ model Product {
   supplier          String?
   description       String?
   imageUrl          String?
-  tags              String? // Stored as JSON string e.g. ["organic", "fruit"]
+  tags              String? // JSON string for tags: ["organic", "fruit"]
   lowStockThreshold Int?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -27,17 +27,11 @@ model Product {
   purchaseOrderItems PurchaseOrderItem[]
 }
 
-enum Role {
-  ADMIN
-  MANAGER
-  STAFF
-}
-
 model User {
   id          String   @id @default(cuid())
   name        String
   email       String   @unique
-  role        Role     @default(STAFF)
+  role        String   // Changed from Role enum to String
   avatarUrl   String?
   isActive    Boolean  @default(true)
   lastLogin   DateTime?
@@ -47,25 +41,13 @@ model User {
   purchaseOrders PurchaseOrder[] @relation("CreatedBy")
 }
 
-enum PurchaseOrderStatus {
-  Draft
-  PendingApproval
-  Approved
-  Ordered
-  Shipped
-  PartiallyReceived
-  Received
-  Cancelled
-  Closed
-}
-
 model PurchaseOrder {
-  id                   String              @id @default(cuid())
-  poNumber             String              @unique
+  id                   String   @id @default(cuid())
+  poNumber             String   @unique
   supplierName         String
   orderDate            DateTime
   expectedDeliveryDate DateTime?
-  status               PurchaseOrderStatus @default(Draft)
+  status               String   // Changed from PurchaseOrderStatus enum to String
   items                PurchaseOrderItem[]
   discountAmount       Float?
   shippingCost         Float?
@@ -73,9 +55,9 @@ model PurchaseOrder {
   totalAmount          Float
   notes                String?
   createdById          String
-  createdBy            User                @relation("CreatedBy", fields: [createdById], references: [id])
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  createdBy            User     @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@index([createdById])
 }
@@ -85,12 +67,12 @@ model PurchaseOrderItem {
   purchaseOrderId   String
   purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   productId         String
-  productName       String // Denormalized for easier display
   product           Product  @relation(fields: [productId], references: [id])
+  productName       String   // Store for historical data, in case product name changes
   quantityOrdered   Int
   quantityReceived  Int?
   unitCost          Float
-  totalCost         Float    // quantityOrdered * unitCost
+  totalCost         Float    // Calculated: quantityOrdered * unitCost
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -99,7 +81,7 @@ model PurchaseOrderItem {
 }
 
 model AppSettings {
-  id                 String   @id @default("main_settings") // Use a fixed ID for singleton
+  id                 String   @id @default("main_settings") // Use a fixed ID for the single settings record
   appName            String   @default("StockPilot")
   dateFormat         String   @default("MM/dd/yyyy")
   timeZone           String   @default("America/New_York")

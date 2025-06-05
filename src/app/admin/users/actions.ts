@@ -9,7 +9,7 @@ import { revalidatePath } from 'next/cache';
 const mapPrismaUserToAppUser = (prismaUser: any): User => {
   return {
     ...prismaUser,
-    role: prismaUser.role as UserRole, // Cast to our UserRole enum
+    role: prismaUser.role as UserRole, // Role is now string, so cast is less critical but kept for consistency
     lastLogin: prismaUser.lastLogin?.toISOString() || null,
     createdAt: prismaUser.createdAt.toISOString(),
     updatedAt: prismaUser.updatedAt.toISOString(),

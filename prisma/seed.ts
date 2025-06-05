@@ -1,5 +1,5 @@
 
-import { PrismaClient, Role, PurchaseOrderStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -7,7 +7,7 @@ async function main() {
   console.log(`Start seeding ...`);
 
   // Clear existing data in reverse order of dependency
-  await prisma.appSettings.deleteMany(); // Clear settings first
+  await prisma.appSettings.deleteMany(); 
   await prisma.purchaseOrderItem.deleteMany();
   await prisma.purchaseOrder.deleteMany();
   await prisma.user.deleteMany();
@@ -16,9 +16,9 @@ async function main() {
   // Seed AppSettings (ensure only one record)
   await prisma.appSettings.upsert({
     where: { id: 'main_settings' },
-    update: {}, // No specific updates if it exists, just ensure it's there
+    update: {}, 
     create: {
-      id: 'main_settings', // Fixed ID
+      id: 'main_settings', 
       appName: "StockPilot HQ",
       dateFormat: "yyyy-MM-dd",
       timeZone: "Europe/London",
@@ -33,19 +33,19 @@ async function main() {
   // Seed Products
   const productsToCreate = [
     {
-      id: 'prod_apple', name: 'Organic Apples', sku: 'ORG-APP-001', category: 'Fruits', quantity: 150, price: 2.99, costPrice: 1.50, supplier: 'Fresh Farms Inc.', description: 'Crisp and delicious organic apples, perfect for snacking or baking.', imageUrl: 'https://placehold.co/300x200.png', tags: JSON.stringify(['organic', 'fruit', 'healthy']), lowStockThreshold: 20,
+      id: 'prod_apple', name: 'Organic Apples', sku: 'ORG-APP-001', category: 'Fruits', quantity: 150, price: 2.99, costPrice: 1.50, supplier: 'Fresh Farms Inc.', description: 'Crisp and delicious organic apples, perfect for snacking or baking.', imageUrl: 'https://placehold.co/300x200/a2cf6e/ffffff.png?text=Apples', tags: JSON.stringify(['organic', 'fruit', 'healthy']), lowStockThreshold: 20,
     },
     {
-      id: 'prod_bread', name: 'Whole Wheat Bread', sku: 'WW-BRD-002', category: 'Bakery', quantity: 75, price: 4.50, costPrice: 2.20, supplier: 'Artisan Bakers Co.', description: 'Freshly baked whole wheat bread, rich in fiber.', imageUrl: 'https://placehold.co/300x200.png', tags: JSON.stringify(['bakery', 'bread', 'whole wheat']), lowStockThreshold: 10,
+      id: 'prod_bread', name: 'Whole Wheat Bread', sku: 'WW-BRD-002', category: 'Bakery', quantity: 75, price: 4.50, costPrice: 2.20, supplier: 'Artisan Bakers Co.', description: 'Freshly baked whole wheat bread, rich in fiber.', imageUrl: 'https://placehold.co/300x200/d4a373/ffffff.png?text=Bread', tags: JSON.stringify(['bakery', 'bread', 'whole wheat']), lowStockThreshold: 10,
     },
     {
-      id: 'prod_eggs', name: 'Free-Range Eggs (Dozen)', sku: 'FR-EGG-003', category: 'Dairy & Eggs', quantity: 100, price: 5.99, costPrice: 3.00, supplier: 'Happy Hens Farm', description: 'Grade A large free-range eggs.', imageUrl: 'https://placehold.co/300x200.png', tags: JSON.stringify(['eggs', 'dairy', 'free-range']), lowStockThreshold: 15,
+      id: 'prod_eggs', name: 'Free-Range Eggs (Dozen)', sku: 'FR-EGG-003', category: 'Dairy & Eggs', quantity: 100, price: 5.99, costPrice: 3.00, supplier: 'Happy Hens Farm', description: 'Grade A large free-range eggs.', imageUrl: 'https://placehold.co/300x200/fefae0/000000.png?text=Eggs', tags: JSON.stringify(['eggs', 'dairy', 'free-range']), lowStockThreshold: 15,
     },
     {
-      id: 'prod_coffee', name: 'Artisanal Coffee Beans', sku: 'COF-BEA-004', category: 'Beverages', quantity: 50, price: 12.99, costPrice: 7.50, supplier: 'Roast Masters Ltd.', description: 'Premium whole coffee beans, medium roast.', imageUrl: 'https://placehold.co/300x200.png', tags: JSON.stringify(['coffee', 'beverage', 'premium']), lowStockThreshold: 5,
+      id: 'prod_coffee', name: 'Artisanal Coffee Beans', sku: 'COF-BEA-004', category: 'Beverages', quantity: 50, price: 12.99, costPrice: 7.50, supplier: 'Roast Masters Ltd.', description: 'Premium whole coffee beans, medium roast.', imageUrl: 'https://placehold.co/300x200/6f4e37/ffffff.png?text=Coffee', tags: JSON.stringify(['coffee', 'beverage', 'premium']), lowStockThreshold: 5,
     },
     {
-      id: 'prod_oil', name: 'Extra Virgin Olive Oil', sku: 'OIL-EVO-005', category: 'Pantry Staples', quantity: 80, price: 9.75, costPrice: 5.25, supplier: 'Mediterranean Groves', description: 'Cold-pressed extra virgin olive oil, 500ml.', imageUrl: 'https://placehold.co/300x200.png', tags: JSON.stringify(['oil', 'pantry', 'cooking']), lowStockThreshold: 10,
+      id: 'prod_oil', name: 'Extra Virgin Olive Oil', sku: 'OIL-EVO-005', category: 'Pantry Staples', quantity: 80, price: 9.75, costPrice: 5.25, supplier: 'Mediterranean Groves', description: 'Cold-pressed extra virgin olive oil, 500ml.', imageUrl: 'https://placehold.co/300x200/808000/ffffff.png?text=Oil', tags: JSON.stringify(['oil', 'pantry', 'cooking']), lowStockThreshold: 10,
     },
   ];
 
@@ -59,16 +59,16 @@ async function main() {
   // Seed Users
   const usersToCreate = [
     {
-      id: 'user_admin_alice', name: 'Alice Wonderland', email: 'alice@stockpilot.com', role: Role.ADMIN, avatarUrl: 'https://placehold.co/100x100/E91E63/FFFFFF.png?text=AW', isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 2),
+      id: 'user_admin_alice', name: 'Alice Wonderland', email: 'alice@stockpilot.com', role: "ADMIN", avatarUrl: 'https://placehold.co/100x100/E91E63/FFFFFF.png?text=AW', isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 2),
     },
     {
-      id: 'user_manager_bob', name: 'Bob The Builder', email: 'bob@stockpilot.com', role: Role.MANAGER, avatarUrl: 'https://placehold.co/100x100/FFC107/000000.png?text=BB', isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+      id: 'user_manager_bob', name: 'Bob The Builder', email: 'bob@stockpilot.com', role: "MANAGER", avatarUrl: 'https://placehold.co/100x100/FFC107/000000.png?text=BB', isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
     },
     {
-      id: 'user_staff_charlie', name: 'Charlie Brown', email: 'charlie@stockpilot.com', role: Role.STAFF, avatarUrl: 'https://placehold.co/100x100/4CAF50/FFFFFF.png?text=CB', isActive: false,
+      id: 'user_staff_charlie', name: 'Charlie Brown', email: 'charlie@stockpilot.com', role: "STAFF", avatarUrl: 'https://placehold.co/100x100/4CAF50/FFFFFF.png?text=CB', isActive: false,
     },
     {
-      id: 'user_staff_diana', name: 'Diana Prince', email: 'diana@stockpilot.com', role: Role.STAFF, isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 30),
+      id: 'user_staff_diana', name: 'Diana Prince', email: 'diana@stockpilot.com', role: "STAFF", isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 30),
     },
   ];
   
@@ -81,7 +81,7 @@ async function main() {
 
   // Seed Purchase Orders
   if (createdProducts.length > 0 && createdUsers.length > 0) {
-    const adminUser = createdUsers.find(u => u.role === Role.ADMIN);
+    const adminUser = createdUsers.find(u => u.role === "ADMIN");
     if (!adminUser) {
         console.error("Admin user not found for seeding POs. Skipping PO seeding.");
         return;
@@ -93,17 +93,17 @@ async function main() {
         supplierName: 'Fresh Farms Inc.',
         orderDate: new Date('2024-07-15T10:00:00Z'),
         expectedDeliveryDate: new Date('2024-07-20T10:00:00Z'),
-        status: PurchaseOrderStatus.Received,
+        status: "Received", // String value
         discountAmount: 0,
         shippingCost: 10.00,
         taxes: 5.00,
-        totalAmount: 90.00, // 75 (items) + 10 (shipping) + 5 (taxes)
+        totalAmount: 90.00, 
         notes: 'Ensure apples are fresh upon delivery.',
         createdById: adminUser.id,
         items: {
           create: [
             {
-              productId: createdProducts[0].id, // Organic Apples
+              productId: createdProducts[0].id, 
               productName: createdProducts[0].name,
               quantityOrdered: 50,
               quantityReceived: 50,
@@ -122,16 +122,16 @@ async function main() {
         supplierName: 'Artisan Bakers Co.',
         orderDate: new Date('2024-07-18T11:00:00Z'),
         expectedDeliveryDate: new Date('2024-07-25T11:00:00Z'),
-        status: PurchaseOrderStatus.Ordered,
+        status: "Ordered", // String value
         discountAmount: 5.00,
         shippingCost: 5.00,
         taxes: 0.00,
-        totalAmount: 66.00, // 66 (items) - 5 (discount) + 5 (shipping)
+        totalAmount: 66.00, 
         createdById: adminUser.id,
         items: {
           create: [
             {
-              productId: createdProducts[1].id, // Whole Wheat Bread
+              productId: createdProducts[1].id, 
               productName: createdProducts[1].name,
               quantityOrdered: 30,
               unitCost: createdProducts[1].costPrice || 2.20,
@@ -143,7 +143,6 @@ async function main() {
     });
     console.log(`Created PO with id: ${po2.id}`);
   }
-
 
   console.log(`Seeding finished.`);
 }

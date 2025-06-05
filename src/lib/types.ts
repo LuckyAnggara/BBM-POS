@@ -1,5 +1,5 @@
 
-import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, Role as PrismaRole, PurchaseOrderStatus as PrismaPurchaseOrderStatus, AppSettings as PrismaAppSettings } from '@prisma/client';
+import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, AppSettings as PrismaAppSettings } from '@prisma/client';
 
 export interface Product {
   id: string;
@@ -26,7 +26,8 @@ export interface CartItem {
   imageUrl?: string | null;
 }
 
-export type PurchaseOrderStatus = PrismaPurchaseOrderStatus;
+// PurchaseOrderStatus is now a string type. Validation will rely on purchaseOrderStatusOptions.
+export type PurchaseOrderStatus = string;
 
 export interface PurchaseOrderItem {
   id: string;
@@ -47,7 +48,7 @@ export interface PurchaseOrder {
   supplierName: string;
   orderDate: string; // ISO date string
   expectedDeliveryDate?: string | null; // ISO date string
-  status: PurchaseOrderStatus;
+  status: PurchaseOrderStatus; // Now string
   items: PurchaseOrderItem[];
   discountAmount?: number | null;
   shippingCost?: number | null;
@@ -60,14 +61,14 @@ export interface PurchaseOrder {
   updatedAt: string; // ISO date string
 }
 
-
-export type UserRole = PrismaRole;
+// UserRole is now a string type.
+export type UserRole = string;
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole; // Now string
   avatarUrl?: string | null;
   isActive: boolean;
   lastLogin?: string | null; // ISO date string or null

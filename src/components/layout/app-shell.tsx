@@ -61,7 +61,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <SidebarProvider defaultOpen>
-      <Sidebar className="flex flex-col">
+      <Sidebar className="flex flex-col" collapsible="icon">
         <SidebarHeader className="p-4">
           <Link href="/" className="flex items-center gap-2">
             <Building className="h-8 w-8 text-primary" />
@@ -78,12 +78,13 @@ export function AppShell({ children }: AppShellProps) {
                     // @ts-ignore TODO: Fix this type issue, Radix CollapsibleTrigger expects a specific type for asChild with button
                     asChild={false} 
                     isActive={item.subItems.some(sub => pathname?.startsWith(sub.href))}
+                    tooltip={item.label}
                   >
                     <span className="flex items-center gap-2">
                       <item.icon />
                       {item.label}
                     </span>
-                    <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                    <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180 group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                   <SidebarMenuSub>
                     {item.subItems.map((subItem) => (
@@ -104,7 +105,11 @@ export function AppShell({ children }: AppShellProps) {
               ) : (
                 <SidebarMenuItem key={item.href}>
                   <Link href={item.href} legacyBehavior passHref>
-                    <SidebarMenuButton isActive={pathname === item.href} asChild={false}>
+                    <SidebarMenuButton 
+                      isActive={pathname === item.href} 
+                      asChild={false}
+                      tooltip={item.label}
+                    >
                       <item.icon />
                       {item.label}
                     </SidebarMenuButton>
@@ -131,8 +136,8 @@ export function AppShell({ children }: AppShellProps) {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset className="flex flex-col">
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background/80 px-6 backdrop-blur-sm md:justify-end">
-            <SidebarTrigger className="md:hidden" />
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background/80 px-6 backdrop-blur-sm">
+            <SidebarTrigger />
              {/* Add any header content here, like search or notifications */}
         </header>
         <main className="flex-1 overflow-auto p-6">

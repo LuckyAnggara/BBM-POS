@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
@@ -20,12 +21,12 @@ import {
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
+import Link from 'next/link';
+// import { format } from 'date-fns'; // Not used yet
 
 export default function AdminProductManagementPage() {
   const { products, fetchProducts, isLoading, deleteProduct, updateProduct } = useInventoryStore();
   const [searchTerm, setSearchTerm] = useState('');
-  // Admin specific product management might have different views or actions
 
   useEffect(() => {
     fetchProducts();
@@ -52,15 +53,12 @@ export default function AdminProductManagementPage() {
   };
   
   const toggleProductAvailability = (product: Product) => {
-    // This is a placeholder for a real 'isAvailable' field or similar
-    // For now, we can simulate this by perhaps changing a tag or a custom field if it existed.
-    // Let's assume we are toggling a hypothetical 'isArchived' status for admin.
     const newArchivedStatus = !(product.tags?.includes('archived'));
     const newTags = newArchivedStatus 
       ? [...(product.tags || []), 'archived'] 
       : product.tags?.filter(t => t !== 'archived');
     
-    updateProduct(product.id, { tags: newTags });
+    updateProduct(product.id, { tags: newTags }); // This will update the product in the store
     toast.success(`Product "${product.name}" ${newArchivedStatus ? 'archived' : 'unarchived'}.`);
   };
 
@@ -72,9 +70,11 @@ export default function AdminProductManagementPage() {
           <CardTitle className="font-headline">Product Catalog Management</CardTitle>
           <CardDescription>Oversee and manage all products in the system. Set pricing, stock, and supplier details.</CardDescription>
         </div>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
-        </Button>
+        <Link href="/inventory/add" passHref>
+            <Button>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add New Product
+            </Button>
+        </Link>
       </CardHeader>
       <CardContent>
         <div className="mb-4 flex items-center gap-2">
@@ -151,17 +151,19 @@ export default function AdminProductManagementPage() {
               {filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
-                    <Image
-                      src={product.imageUrl || "https://placehold.co/40x40.png"}
-                      alt={product.name}
-                      width={40}
-                      height={40}
-                      className="rounded-md object-cover"
-                       data-ai-hint="product thumbnail"
-                    />
+                     <Link href={`/inventory/${product.id}`}>
+                        <Image
+                        src={product.imageUrl || "https://placehold.co/40x40.png"}
+                        alt={product.name}
+                        width={40}
+                        height={40}
+                        className="rounded-md object-cover hover:opacity-80 transition-opacity"
+                        data-ai-hint="product thumbnail"
+                        />
+                    </Link>
                   </TableCell>
                   <TableCell>
-                    <div className="font-medium">{product.name}</div>
+                    <Link href={`/inventory/${product.id}`} className="font-medium hover:underline">{product.name}</Link>
                     <div className="text-xs text-muted-foreground">SKU: {product.sku}</div>
                   </TableCell>
                   <TableCell className="text-xs">{product.category}</TableCell>
@@ -187,11 +189,15 @@ export default function AdminProductManagementPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="mr-2 h-4 w-4" /> View Details
+                        <DropdownMenuItem asChild>
+                          <Link href={`/inventory/${product.id}`}>
+                            <Eye className="mr-2 h-4 w-4" /> View Details
+                          </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Edit className="mr-2 h-4 w-4" /> Edit Product
+                        <DropdownMenuItem asChild>
+                          <Link href={`/inventory/${product.id}/edit`}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit Product
+                          </Link>
                         </DropdownMenuItem>
                          <DropdownMenuItem onClick={() => toggleProductAvailability(product)}>
                           {product.tags?.includes('archived') ? <PackageCheck className="mr-2 h-4 w-4" /> : <PackageX className="mr-2 h-4 w-4" />}

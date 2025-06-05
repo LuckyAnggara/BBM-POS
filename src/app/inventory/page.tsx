@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Edit, Trash2, Search, Filter, List, LayoutGrid, MoreHorizontal } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Filter, List, LayoutGrid, MoreHorizontal, Eye } from "lucide-react";
 import Image from 'next/image';
 import { useInventoryStore } from '@/store/inventory-store';
 import type { Product } from '@/lib/types';
@@ -27,16 +27,19 @@ import Link from 'next/link';
 const ProductCardItem = ({ product, onDeleteClick }: { product: Product; onDeleteClick: (productId: string) => void }) => (
   <Card className="flex flex-col">
     <CardHeader className="p-4">
-      <div className="aspect-[3/2] w-full relative overflow-hidden rounded-md mb-2">
+      <Link href={`/inventory/${product.id}`} className="block aspect-[3/2] w-full relative overflow-hidden rounded-md mb-2 group">
         <Image
           src={product.imageUrl || "https://placehold.co/300x200.png"}
           alt={product.name}
           layout="fill"
           objectFit="cover"
+          className="transition-transform duration-300 group-hover:scale-105"
           data-ai-hint="product image"
         />
-      </div>
-      <CardTitle className="text-lg font-headline">{product.name}</CardTitle>
+      </Link>
+      <CardTitle className="text-lg font-headline">
+         <Link href={`/inventory/${product.id}`} className="hover:underline">{product.name}</Link>
+      </CardTitle>
       <CardDescription>{product.category} - SKU: {product.sku}</CardDescription>
     </CardHeader>
     <CardContent className="p-4 flex-grow">
@@ -51,10 +54,12 @@ const ProductCardItem = ({ product, onDeleteClick }: { product: Product; onDelet
         </Badge>
       </div>
     </CardContent>
-    <CardFooter className="p-4 border-t">
-      <Button variant="outline" size="sm" className="mr-2 w-full">
-        <Edit className="mr-2 h-4 w-4" /> Edit
-      </Button>
+    <CardFooter className="p-4 border-t gap-2">
+      <Link href={`/inventory/${product.id}`} className="w-full" passHref>
+        <Button variant="outline" size="sm" className="w-full">
+          <Eye className="mr-2 h-4 w-4" /> View Details
+        </Button>
+      </Link>
       <Button variant="destructive" size="sm" className="w-full" onClick={() => onDeleteClick(product.id)}>
         <Trash2 className="mr-2 h-4 w-4" /> Delete
       </Button>
@@ -136,10 +141,10 @@ export default function InventoryPage() {
                 <DropdownMenuCheckboxItem>Dairy & Eggs</DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="outline" size="icon" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'bg-accent text-accent-foreground' : ''}>
+            <Button variant="outline" size="icon" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'bg-accent text-accent-foreground' : ''} aria-label="List view">
               <List className="h-4 w-4"/>
             </Button>
-            <Button variant="outline" size="icon" onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'bg-accent text-accent-foreground' : ''}>
+            <Button variant="outline" size="icon" onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'bg-accent text-accent-foreground' : ''} aria-label="Grid view">
               <LayoutGrid className="h-4 w-4"/>
             </Button>
             </div>
@@ -210,16 +215,22 @@ export default function InventoryPage() {
                   {filteredProducts.map((product) => (
                     <TableRow key={product.id}>
                       <TableCell>
-                        <Image
-                          src={product.imageUrl || "https://placehold.co/64x64.png"}
-                          alt={product.name}
-                          width={48}
-                          height={48}
-                          className="rounded-md object-cover"
-                          data-ai-hint="product thumbnail"
-                        />
+                        <Link href={`/inventory/${product.id}`}>
+                          <Image
+                            src={product.imageUrl || "https://placehold.co/64x64.png"}
+                            alt={product.name}
+                            width={48}
+                            height={48}
+                            className="rounded-md object-cover hover:opacity-80 transition-opacity"
+                            data-ai-hint="product thumbnail"
+                          />
+                        </Link>
                       </TableCell>
-                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/inventory/${product.id}`} className="hover:underline">
+                          {product.name}
+                        </Link>
+                      </TableCell>
                       <TableCell>{product.sku}</TableCell>
                       <TableCell>{product.category}</TableCell>
                       <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
@@ -236,9 +247,17 @@ export default function InventoryPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Edit className="mr-2 h-4 w-4" /> View/Edit
+                            <DropdownMenuItem asChild>
+                              <Link href={`/inventory/${product.id}`}>
+                                <Eye className="mr-2 h-4 w-4" /> View Details
+                              </Link>
                             </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                               <Link href={`/inventory/${product.id}/edit`}>
+                                <Edit className="mr-2 h-4 w-4" /> Edit
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator/>
                             <DropdownMenuItem onClick={() => handleDelete(product.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                               <Trash2 className="mr-2 h-4 w-4" /> Delete
                             </DropdownMenuItem>

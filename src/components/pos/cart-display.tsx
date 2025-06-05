@@ -1,35 +1,67 @@
+
 'use client';
 import { useCartStore } from '@/store/cart-store';
+import { useInventoryStore } from '@/store/inventory-store';
 import type { CartItem } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Plus, Minus, ShoppingCart, CreditCard } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { useState } from 'react';
 
 export function CartDisplay() {
   const { items, removeItem, updateItemQuantity, clearCart, totalItems, totalPrice } = useCartStore();
+  const { decreaseStock, products: inventoryProducts, getProductById } = useInventoryStore();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   const handleQuantityChange = (productId: string, currentQuantity: number, change: number) => {
     const newQuantity = currentQuantity + change;
-    if (newQuantity >= 0) { // Allow quantity to be 0 to effectively remove item via input logic
+    if (newQuantity >= 0) { 
       updateItemQuantity(productId, newQuantity);
     }
   };
   
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (items.length === 0) {
       toast.error("Your cart is empty. Please add items to proceed.");
       return;
     }
-    // Placeholder for checkout logic
-    toast.success("Proceeding to checkout...", {
-        description: `Total: $${totalPrice().toFixed(2)} for ${totalItems()} items.`
-    });
-    // clearCart(); // Optionally clear cart after checkout attempt
+
+    setIsCheckingOut(true);
+
+    // Check stock availability before proceeding
+    for (const item of items) {
+      const productInInventory = getProductById(item.productId);
+      if (!productInInventory || productInInventory.quantity < item.quantity) {
+        toast.error(`Not enough stock for ${item.name}. Available: ${productInInventory?.quantity || 0}. Required: ${item.quantity}`);
+        setIsCheckingOut(false);
+        return;
+      }
+    }
+    
+    // Simulate payment processing
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    try {
+      // Decrease stock for each item
+      for (const item of items) {
+        await decreaseStock(item.productId, item.quantity);
+      }
+
+      toast.success("Checkout successful!", {
+          description: `Total: $${(totalPrice() * 1.10).toFixed(2)} for ${totalItems()} items.` // Assuming 10% tax
+      });
+      clearCart();
+    } catch (error) {
+        toast.error("An error occurred during checkout. Please try again.");
+        console.error("Checkout error:", error);
+    } finally {
+        setIsCheckingOut(false);
+    }
   };
 
   return (
@@ -65,7 +97,7 @@ export function CartDisplay() {
                     <h4 className="font-semibold text-sm truncate" title={item.name}>{item.name}</h4>
                     <p className="text-xs text-muted-foreground">${item.price.toFixed(2)} each</p>
                     <div className="flex items-center mt-1">
-                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleQuantityChange(item.productId, item.quantity, -1)}>
+                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleQuantityChange(item.productId, item.quantity, -1)} disabled={isCheckingOut}>
                         <Minus className="h-3 w-3" />
                       </Button>
                       <Input
@@ -77,15 +109,16 @@ export function CartDisplay() {
                         }}
                         className="h-7 w-12 text-center mx-1 px-1"
                         min="0"
+                        disabled={isCheckingOut}
                       />
-                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleQuantityChange(item.productId, item.quantity, 1)}>
+                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleQuantityChange(item.productId, item.quantity, 1)} disabled={isCheckingOut}>
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => removeItem(item.productId)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => removeItem(item.productId)} disabled={isCheckingOut}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -110,10 +143,11 @@ export function CartDisplay() {
             <span>Total</span>
             <span>${(totalPrice() * 1.10).toFixed(2)}</span>
           </div>
-          <Button size="lg" className="w-full mt-2" onClick={handleCheckout}>
-            <CreditCard className="mr-2 h-5 w-5" /> Proceed to Payment
+          <Button size="lg" className="w-full mt-2" onClick={handleCheckout} disabled={isCheckingOut}>
+            {isCheckingOut ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+            {isCheckingOut ? 'Processing...' : 'Proceed to Payment'}
           </Button>
-          <Button variant="outline" className="w-full" onClick={clearCart}>
+          <Button variant="outline" className="w-full" onClick={clearCart} disabled={isCheckingOut}>
             Clear Cart
           </Button>
         </CardFooter>

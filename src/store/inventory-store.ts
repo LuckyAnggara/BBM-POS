@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import type { Product } from '@/lib/types';
 import { toast } from 'sonner';
@@ -7,9 +8,11 @@ interface InventoryState {
   isLoading: boolean;
   error: string | null;
   fetchProducts: () => Promise<void>;
+  getProductById: (productId: string) => Product | undefined;
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateProduct: (productId: string, updatedProductData: Partial<Product>) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
+  decreaseStock: (productId: string, quantityToDecrease: number) => Promise<void>;
 }
 
 // Mock data
@@ -27,8 +30,8 @@ const mockProducts: Product[] = [
     imageUrl: 'https://placehold.co/300x200.png',
     tags: ['organic', 'fruit', 'healthy'],
     lowStockThreshold: 20,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(), // 5 days ago
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(), // 1 day ago
   },
   {
     id: '2',
@@ -43,8 +46,8 @@ const mockProducts: Product[] = [
     imageUrl: 'https://placehold.co/300x200.png',
     tags: ['bakery', 'bread', 'whole wheat'],
     lowStockThreshold: 10,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
   },
   {
     id: '3',
@@ -59,8 +62,8 @@ const mockProducts: Product[] = [
     imageUrl: 'https://placehold.co/300x200.png',
     tags: ['eggs', 'dairy', 'free-range'],
     lowStockThreshold: 15,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 8).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
   },
 ];
 
@@ -70,11 +73,15 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   isLoading: false,
   error: null,
   fetchProducts: async () => {
+    if (get().products.length > 0 && !get().isLoading) return; // Avoid refetch if already loaded unless forced
     set({ isLoading: true, error: null });
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 700));
     set({ products: mockProducts, isLoading: false });
     // toast.success('Products loaded successfully');
+  },
+  getProductById: (productId) => {
+    return get().products.find(p => p.id === productId);
   },
   addProduct: async (productData) => {
     set({ isLoading: true });
@@ -82,34 +89,77 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     await new Promise(resolve => setTimeout(resolve, 500));
     const newProduct: Product = {
       ...productData,
-      id: String(Date.now()),
+      id: String(Date.now()), // Simple ID generation for mock
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     set(state => ({ products: [...state.products, newProduct], isLoading: false }));
+    mockProducts.push(newProduct); // Keep mock data in sync for this session
     toast.success(`Product "${newProduct.name}" added successfully.`);
   },
   updateProduct: async (productId, updatedProductData) => {
     set({ isLoading: true });
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 500));
+    let productName = 'Product';
     set(state => ({
-      products: state.products.map(p =>
-        p.id === productId ? { ...p, ...updatedProductData, updatedAt: new Date().toISOString() } : p
-      ),
+      products: state.products.map(p => {
+        if (p.id === productId) {
+          productName = updatedProductData.name || p.name;
+          return { ...p, ...updatedProductData, updatedAt: new Date().toISOString() };
+        }
+        return p;
+      }),
       isLoading: false,
     }));
-    toast.success(`Product updated successfully.`);
+    // Update mockProducts array as well
+    const mockIndex = mockProducts.findIndex(p => p.id === productId);
+    if (mockIndex !== -1) {
+      mockProducts[mockIndex] = { ...mockProducts[mockIndex], ...updatedProductData, updatedAt: new Date().toISOString() };
+    }
+    toast.success(`Product "${productName}" updated successfully.`);
   },
   deleteProduct: async (productId) => {
-    set({ isLoading: true });
+    // set({ isLoading: true }); // Deleting shouldn't feel like loading
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
     const productName = get().products.find(p => p.id === productId)?.name || 'Product';
     set(state => ({
       products: state.products.filter(p => p.id !== productId),
-      isLoading: false,
+      // isLoading: false,
     }));
+    const mockIndex = mockProducts.findIndex(p => p.id === productId);
+    if (mockIndex !== -1) {
+      mockProducts.splice(mockIndex, 1);
+    }
     toast.success(`"${productName}" deleted successfully.`);
+  },
+  decreaseStock: async (productId, quantityToDecrease) => {
+    // No need to set isLoading for this, it should be a quick background update
+    // Simulate API call delay if needed, but usually not for stock updates
+    // await new Promise(resolve => setTimeout(resolve, 100)); 
+    set(state => {
+      const product = state.products.find(p => p.id === productId);
+      if (product) {
+        const newQuantity = Math.max(0, product.quantity - quantityToDecrease); // Ensure quantity doesn't go below 0
+        // if (product.quantity - quantityToDecrease < 0) {
+        //   toast.warning(`Not enough stock for ${product.name}. Stock set to 0.`);
+        // }
+        
+        const updatedProducts = state.products.map(p =>
+          p.id === productId ? { ...p, quantity: newQuantity, updatedAt: new Date().toISOString() } : p
+        );
+
+        // Update mockProducts array as well
+        const mockIndex = mockProducts.findIndex(p => p.id === productId);
+        if (mockIndex !== -1) {
+          mockProducts[mockIndex] = { ...mockProducts[mockIndex], quantity: newQuantity, updatedAt: new Date().toISOString() };
+        }
+        // console.log(`Stock for ${product.name} decreased by ${quantityToDecrease}. New quantity: ${newQuantity}`);
+        return { products: updatedProducts };
+      }
+      return state; // No change if product not found
+    });
+    // No toast here, POS checkout will give overall success
   },
 }));

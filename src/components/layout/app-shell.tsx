@@ -1,3 +1,4 @@
+
 'use client';
 import type { ReactNode } from 'react';
 import {
@@ -13,8 +14,8 @@ import {
   SidebarMenuButton,
   SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarGroup,
-  SidebarGroupLabel,
+  // SidebarGroup, // Not used
+  // SidebarGroupLabel, // Not used
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -29,9 +30,9 @@ import {
   ChevronDown,
   Package,
   LogOut,
-  CreditCard,
+  // CreditCard, // Not used in this component directly
   SlidersHorizontal,
-  ClipboardList,
+  // ClipboardList, // Not used in this component directly
   Building,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
@@ -48,10 +49,13 @@ const navItems = [
   {
     label: 'Admin',
     icon: SlidersHorizontal,
+    // Ensure base admin path is included for isActive check if it's a valid link target itself
+    // For now, assuming direct navigation to /admin shows the overview.
     subItems: [
+      { href: '/admin', label: 'Overview', icon: Settings }, 
       { href: '/admin/users', label: 'Users', icon: Users },
       { href: '/admin/products', label: 'Products', icon: Package },
-      { href: '/admin/settings', label: 'Settings', icon: Settings },
+      { href: '/admin/settings', label: 'System Settings', icon: Settings }, // Changed label for clarity
     ],
   },
 ];
@@ -65,7 +69,8 @@ export function AppShell({ children }: AppShellProps) {
         <SidebarHeader className="p-4">
           <Link href="/" className="flex items-center gap-2">
             <Building className="h-8 w-8 text-primary" />
-            <h1 className="text-xl font-headline font-semibold">StockPilot</h1>
+            {/* Text hides when sidebar is in icon mode */}
+            <h1 className="text-xl font-headline font-semibold group-data-[collapsible=icon]:hidden">StockPilot</h1>
           </Link>
         </SidebarHeader>
         <SidebarContent className="flex-1 p-0">
@@ -75,15 +80,17 @@ export function AppShell({ children }: AppShellProps) {
                 <SidebarMenuItem key={item.label} className="relative">
                   <SidebarMenuButton
                     className="justify-between"
-                    // @ts-ignore TODO: Fix this type issue, Radix CollapsibleTrigger expects a specific type for asChild with button
+                    // @ts-ignore Radix CollapsibleTrigger expects a specific type for asChild with button
                     asChild={false} 
-                    isActive={item.subItems.some(sub => pathname?.startsWith(sub.href))}
-                    tooltip={item.label}
+                    isActive={item.subItems.some(sub => pathname === sub.href || (pathname && sub.href !== '/admin' && pathname.startsWith(sub.href)) || (sub.href === '/admin' && pathname === '/admin'))}
+                    tooltip={{content: item.label, side: 'right', align: 'center' }}
                   >
                     <span className="flex items-center gap-2">
                       <item.icon />
-                      {item.label}
+                      {/* Text hides when sidebar is in icon mode */}
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                     </span>
+                    {/* Chevron hides when sidebar is in icon mode */}
                     <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180 group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                   <SidebarMenuSub>
@@ -108,10 +115,11 @@ export function AppShell({ children }: AppShellProps) {
                     <SidebarMenuButton 
                       isActive={pathname === item.href} 
                       asChild={false}
-                      tooltip={item.label}
+                      tooltip={{content: item.label, side: 'right', align: 'center' }}
                     >
                       <item.icon />
-                      {item.label}
+                      {/* Text hides when sidebar is in icon mode */}
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                     </SidebarMenuButton>
                   </Link>
                 </SidebarMenuItem>
@@ -125,7 +133,8 @@ export function AppShell({ children }: AppShellProps) {
               <AvatarImage src="https://placehold.co/100x100.png" alt="User Avatar" data-ai-hint="user avatar" />
               <AvatarFallback>SP</AvatarFallback>
             </Avatar>
-            <div className="flex flex-col">
+            {/* This div and its content (name, email) hide when sidebar is in icon mode */}
+            <div className="flex flex-col group-data-[collapsible=icon]:hidden">
               <span className="text-sm font-medium text-sidebar-foreground">Admin User</span>
               <span className="text-xs text-sidebar-foreground/70">admin@stockpilot.com</span>
             </div>

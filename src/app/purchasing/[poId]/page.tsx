@@ -9,7 +9,7 @@ import { useInventoryStore } from '@/store/inventory-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Edit, CalendarDays, Hash, User, ShoppingBag, AlertTriangle, Loader2, MessageSquare, Info } from 'lucide-react';
+import { ArrowLeft, Edit, CalendarDays, Hash, User, ShoppingBag, AlertTriangle, Loader2, MessageSquare, Info, Percent } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
@@ -29,10 +29,11 @@ export default function PurchaseOrderDetailPage() {
 
   useEffect(() => {
     if (poId) {
+      // Find from the potentially updated mockPurchaseOrders array
       const foundPO = mockPurchaseOrders.find(p => p.id === poId);
       setPurchaseOrder(foundPO || null);
     }
-  }, [poId]); // Refetch PO if poId changes (e.g., navigating between PO details)
+  }, [poId, mockPurchaseOrders]); // Add mockPurchaseOrders to deps to refetch if it changes
 
   const getProductSku = (productId: string): string => {
     const product = inventoryProducts.find(p => p.id === productId);
@@ -178,21 +179,27 @@ export default function PurchaseOrderDetailPage() {
           )}
 
         </CardContent>
-        <CardFooter className="border-t bg-muted/30 p-6 flex flex-col items-end gap-2">
-            <div className="text-right">
+        <CardFooter className="border-t bg-muted/30 p-6 flex flex-col items-end gap-1">
+            <div className="text-right w-full">
                 <p className="text-sm text-muted-foreground">Items Subtotal</p>
                 <p className="text-lg font-semibold">${subtotal.toFixed(2)}</p>
             </div>
-            <div className="text-right">
+            { (purchaseOrder.discountAmount ?? 0) > 0 &&
+                <div className="text-right w-full">
+                    <p className="text-sm text-muted-foreground">Discount</p>
+                    <p className="text-lg font-semibold text-green-600">-${(purchaseOrder.discountAmount || 0).toFixed(2)}</p>
+                </div>
+            }
+            <div className="text-right w-full">
                 <p className="text-sm text-muted-foreground">Shipping Cost</p>
                 <p className="text-lg font-semibold">${(purchaseOrder.shippingCost || 0).toFixed(2)}</p>
             </div>
-             <div className="text-right">
+             <div className="text-right w-full">
                 <p className="text-sm text-muted-foreground">Taxes</p>
                 <p className="text-lg font-semibold">${(purchaseOrder.taxes || 0).toFixed(2)}</p>
             </div>
             <div className="border-t w-full my-2 border-border"></div>
-            <div className="text-right mt-1">
+            <div className="text-right w-full mt-1">
                 <p className="text-sm text-muted-foreground">Grand Total</p>
                 <p className="text-2xl font-bold font-headline">${purchaseOrder.totalAmount.toFixed(2)}</p>
             </div>

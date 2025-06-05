@@ -13,9 +13,10 @@ export const mockPurchaseOrders: PurchaseOrder[] = [
     items: [
       { productId: '1', productName: 'Organic Apples', quantityOrdered: 50, unitCost: 1.50, totalCost: 75.00, quantityReceived: 50 },
     ],
+    discountAmount: 0,
     shippingCost: 10.00,
     taxes: 5.00,
-    totalAmount: 90.00, // 75 (items) + 10 (shipping) + 5 (taxes)
+    totalAmount: 90.00, // 75 (items) - 0 (discount) + 10 (shipping) + 5 (taxes)
     notes: 'Ensure apples are fresh upon delivery.',
     createdBy: 'user1',
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
@@ -32,9 +33,10 @@ export const mockPurchaseOrders: PurchaseOrder[] = [
     items: [
       { productId: '2', productName: 'Whole Wheat Bread', quantityOrdered: 30, unitCost: 2.20, totalCost: 66.00 },
     ],
+    discountAmount: 5.00,
     shippingCost: 5.00,
     taxes: 0.00,
-    totalAmount: 71.00, // 66 (items) + 5 (shipping)
+    totalAmount: 66.00, // 66 (items) - 5 (discount) + 5 (shipping)
     notes: '',
     createdBy: 'user1',
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
@@ -52,14 +54,19 @@ export const mockPurchaseOrders: PurchaseOrder[] = [
       { productId: '1', productName: 'Organic Apples', quantityOrdered: 20, unitCost: 1.50, totalCost: 30.00 },
       { productId: '3', productName: 'Free-Range Eggs (Dozen)', quantityOrdered: 10, unitCost: 3.00, totalCost: 30.00 },
     ],
+    discountAmount: 0,
     shippingCost: 7.50,
     taxes: 2.50,
-    totalAmount: 70.00, // 60 (items) + 7.5 (shipping) + 2.5 (taxes)
+    totalAmount: 70.00, // 60 (items) - 0 (discount) + 7.5 (shipping) + 2.5 (taxes)
     notes: 'Handle eggs with care.',
     createdBy: 'user1',
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
   },
+];
+
+export const purchaseOrderStatusOptions: PurchaseOrder['status'][] = [
+  'Draft', 'Pending Approval', 'Approved', 'Ordered', 'Shipped', 'Partially Received', 'Received', 'Cancelled', 'Closed'
 ];
 
 export const purchaseOrderStatusColors: Record<PurchaseOrder['status'], string> = {

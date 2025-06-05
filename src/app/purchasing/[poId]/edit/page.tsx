@@ -28,9 +28,10 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore } from '@/store/inventory-store';
 import type { Product, PurchaseOrder, PurchaseOrderItem } from '@/lib/types';
-import { mockPurchaseOrders } from '@/lib/mock-data';
+import { mockPurchaseOrders, purchaseOrderStatusOptions } from '@/lib/mock-data';
 import { toast } from 'sonner';
 import { Save, ArrowLeft, PlusCircle, Trash2, CalendarIcon, Loader2, ChevronsUpDown, Check, AlertTriangle } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
@@ -53,7 +54,9 @@ const purchaseOrderSchema = z.object({
   supplierName: z.string().min(1, "Supplier name is required"),
   orderDate: z.date({ required_error: "Order date is required." }),
   expectedDeliveryDate: z.date().optional(),
+  status: z.enum(purchaseOrderStatusOptions as [string, ...string[]], {required_error: "Status is required"}),
   items: z.array(purchaseOrderItemSchema).min(1, "At least one item is required."),
+  discountAmount: z.coerce.number().min(0, "Discount must be non-negative").optional().or(z.literal('')),
   shippingCost: z.coerce.number().min(0, "Shipping cost must be non-negative").optional().or(z.literal('')),
   taxes: z.coerce.number().min(0, "Taxes must be non-negative").optional().or(z.literal('')),
   notes: z.string().optional(),
@@ -81,7 +84,9 @@ export default function EditPurchaseOrderPage() {
       poNumber: '',
       supplierName: '',
       orderDate: new Date(),
+      status: 'Draft',
       items: [{ productId: '', productName: '', quantityOrdered: 1, unitCost: 0 }],
+      discountAmount: '',
       shippingCost: '',
       taxes: '',
       notes: '',
@@ -103,19 +108,21 @@ export default function EditPurchaseOrderPage() {
           supplierName: foundPO.supplierName,
           orderDate: parseISO(foundPO.orderDate),
           expectedDeliveryDate: foundPO.expectedDeliveryDate ? parseISO(foundPO.expectedDeliveryDate) : undefined,
+          status: foundPO.status,
           items: foundPO.items.map(item => ({
             productId: item.productId,
             productName: item.productName,
             quantityOrdered: item.quantityOrdered,
             unitCost: item.unitCost,
           })),
+          discountAmount: foundPO.discountAmount ?? '',
           shippingCost: foundPO.shippingCost ?? '',
           taxes: foundPO.taxes ?? '',
           notes: foundPO.notes || '',
         });
       }
     }
-  }, [poId, form, fetchProducts]); // Removed inventoryProducts from dep array as it caused reset issues
+  }, [poId, form]);
 
    useEffect(() => {
     setComboboxOpenStates(fields.map(() => false));
@@ -134,9 +141,10 @@ export default function EditPurchaseOrderPage() {
     setIsSubmitting(true);
     try {
       const subtotal = calculateSubtotal(data.items);
+      const discount = data.discountAmount !== '' && data.discountAmount !== undefined ? Number(data.discountAmount) : 0;
       const shipping = data.shippingCost !== '' && data.shippingCost !== undefined ? Number(data.shippingCost) : 0;
       const taxAmount = data.taxes !== '' && data.taxes !== undefined ? Number(data.taxes) : 0;
-      const totalAmount = subtotal + shipping + taxAmount;
+      const totalAmount = subtotal - discount + shipping + taxAmount;
       
       const updatedPOData: Partial<PurchaseOrder> = {
         ...existingPO, 
@@ -144,10 +152,12 @@ export default function EditPurchaseOrderPage() {
         supplierName: data.supplierName,
         orderDate: data.orderDate.toISOString(),
         expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
+        status: data.status,
         items: data.items.map(item => ({
           ...item,
           totalCost: item.quantityOrdered * item.unitCost,
         })),
+        discountAmount: discount,
         shippingCost: shipping,
         taxes: taxAmount,
         notes: data.notes,
@@ -171,13 +181,15 @@ export default function EditPurchaseOrderPage() {
   };
 
   const watchedItems = form.watch("items");
+  const watchedDiscountAmount = form.watch("discountAmount");
   const watchedShippingCost = form.watch("shippingCost");
   const watchedTaxes = form.watch("taxes");
 
   const currentSubtotal = calculateSubtotal(watchedItems);
+  const currentDiscount = Number(watchedDiscountAmount) || 0;
   const currentShipping = Number(watchedShippingCost) || 0;
   const currentTaxes = Number(watchedTaxes) || 0;
-  const currentGrandTotal = currentSubtotal + currentShipping + currentTaxes;
+  const currentGrandTotal = currentSubtotal - currentDiscount + currentShipping + currentTaxes;
 
   if (existingPO === undefined || inventoryLoading) {
     return (
@@ -303,6 +315,28 @@ export default function EditPurchaseOrderPage() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select PO status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {purchaseOrderStatusOptions.map(status => (
+                          <SelectItem key={status} value={status}>{status}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
           </Card>
 
@@ -422,6 +456,17 @@ export default function EditPurchaseOrderPage() {
             </CardContent>
              <CardFooter className="flex flex-col md:flex-row justify-between items-start gap-6 border-t pt-6 mt-4">
                 <div className="w-full md:w-1/2 space-y-4">
+                    <FormField
+                        control={form.control}
+                        name="discountAmount"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Discount Amount (Optional)</FormLabel>
+                            <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
                      <FormField
                         control={form.control}
                         name="shippingCost"
@@ -456,21 +501,25 @@ export default function EditPurchaseOrderPage() {
                         )}
                     />
                 </div>
-                 <div className="w-full md:w-auto flex flex-col items-end gap-2 self-end md:self-start">
-                    <div className="text-right">
+                 <div className="w-full md:w-auto flex flex-col items-end gap-1 self-end md:self-start">
+                    <div className="text-right w-full">
                         <p className="text-sm text-muted-foreground">Subtotal</p>
                         <p className="text-lg font-semibold">${currentSubtotal.toFixed(2)}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right w-full">
+                        <p className="text-sm text-muted-foreground">Discount</p>
+                        <p className="text-lg font-semibold text-green-600">-${currentDiscount.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right w-full">
                         <p className="text-sm text-muted-foreground">Shipping</p>
                         <p className="text-lg font-semibold">${currentShipping.toFixed(2)}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right w-full">
                         <p className="text-sm text-muted-foreground">Taxes</p>
                         <p className="text-lg font-semibold">${currentTaxes.toFixed(2)}</p>
                     </div>
                     <div className="border-t w-full my-2"></div>
-                    <div className="text-right">
+                    <div className="text-right w-full">
                         <p className="text-sm text-muted-foreground">Grand Total</p>
                         <p className="text-2xl font-bold font-headline">${currentGrandTotal.toFixed(2)}</p>
                     </div>

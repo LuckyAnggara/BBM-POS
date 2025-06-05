@@ -52,6 +52,7 @@ const purchaseOrderSchema = z.object({
   orderDate: z.date({ required_error: "Order date is required." }),
   expectedDeliveryDate: z.date().optional(),
   items: z.array(purchaseOrderItemSchema).min(1, "At least one item is required in the purchase order."),
+  discountAmount: z.coerce.number().min(0, "Discount must be non-negative").optional().or(z.literal('')),
   shippingCost: z.coerce.number().min(0, "Shipping cost must be non-negative").optional().or(z.literal('')),
   taxes: z.coerce.number().min(0, "Taxes must be non-negative").optional().or(z.literal('')),
   notes: z.string().optional(),
@@ -77,6 +78,7 @@ export default function CreatePurchaseOrderPage() {
       orderDate: new Date(),
       expectedDeliveryDate: undefined,
       items: [{ productId: '', productName: '', quantityOrdered: 1, unitCost: 0 }],
+      discountAmount: '',
       shippingCost: '',
       taxes: '',
       notes: '',
@@ -104,9 +106,10 @@ export default function CreatePurchaseOrderPage() {
     setIsSubmitting(true);
     try {
       const subtotal = calculateSubtotal(data.items);
+      const discount = data.discountAmount ? Number(data.discountAmount) : 0;
       const shipping = data.shippingCost ? Number(data.shippingCost) : 0;
       const taxAmount = data.taxes ? Number(data.taxes) : 0;
-      const totalAmount = subtotal + shipping + taxAmount;
+      const totalAmount = subtotal - discount + shipping + taxAmount;
 
       const newPO: PurchaseOrder = {
         id: `po${Date.now()}`, 
@@ -120,6 +123,7 @@ export default function CreatePurchaseOrderPage() {
           ...item,
           totalCost: item.quantityOrdered * item.unitCost,
         })),
+        discountAmount: discount,
         shippingCost: shipping,
         taxes: taxAmount,
         totalAmount,
@@ -141,13 +145,15 @@ export default function CreatePurchaseOrderPage() {
   };
   
   const watchedItems = form.watch("items");
+  const watchedDiscountAmount = form.watch("discountAmount");
   const watchedShippingCost = form.watch("shippingCost");
   const watchedTaxes = form.watch("taxes");
 
   const currentSubtotal = calculateSubtotal(watchedItems);
+  const currentDiscount = Number(watchedDiscountAmount) || 0;
   const currentShipping = Number(watchedShippingCost) || 0;
   const currentTaxes = Number(watchedTaxes) || 0;
-  const currentGrandTotal = currentSubtotal + currentShipping + currentTaxes;
+  const currentGrandTotal = currentSubtotal - currentDiscount + currentShipping + currentTaxes;
 
 
   return (
@@ -391,6 +397,17 @@ export default function CreatePurchaseOrderPage() {
             </CardContent>
             <CardFooter className="flex flex-col md:flex-row justify-between items-start gap-6 border-t pt-6 mt-4">
                 <div className="w-full md:w-1/2 space-y-4">
+                    <FormField
+                        control={form.control}
+                        name="discountAmount"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Discount Amount (Optional)</FormLabel>
+                            <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
                      <FormField
                         control={form.control}
                         name="shippingCost"
@@ -425,21 +442,25 @@ export default function CreatePurchaseOrderPage() {
                         )}
                     />
                 </div>
-                <div className="w-full md:w-auto flex flex-col items-end gap-2 self-end md:self-start">
-                    <div className="text-right">
+                <div className="w-full md:w-auto flex flex-col items-end gap-1 self-end md:self-start">
+                    <div className="text-right w-full">
                         <p className="text-sm text-muted-foreground">Subtotal</p>
                         <p className="text-lg font-semibold">${currentSubtotal.toFixed(2)}</p>
                     </div>
-                    <div className="text-right">
+                     <div className="text-right w-full">
+                        <p className="text-sm text-muted-foreground">Discount</p>
+                        <p className="text-lg font-semibold text-green-600">-${currentDiscount.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right w-full">
                         <p className="text-sm text-muted-foreground">Shipping</p>
                         <p className="text-lg font-semibold">${currentShipping.toFixed(2)}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right w-full">
                         <p className="text-sm text-muted-foreground">Taxes</p>
                         <p className="text-lg font-semibold">${currentTaxes.toFixed(2)}</p>
                     </div>
                     <div className="border-t w-full my-2"></div>
-                    <div className="text-right">
+                    <div className="text-right w-full">
                         <p className="text-sm text-muted-foreground">Grand Total</p>
                         <p className="text-2xl font-bold font-headline">${currentGrandTotal.toFixed(2)}</p>
                     </div>

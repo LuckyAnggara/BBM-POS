@@ -1,3 +1,4 @@
+
 export interface Product {
   id: string;
   name: string;
@@ -39,6 +40,7 @@ export interface PurchaseOrder {
     unitCost: number;
     totalCost: number;
   }>;
+  discountAmount?: number;
   shippingCost?: number;
   taxes?: number;
   totalAmount: number;
@@ -70,3 +72,4 @@ export interface Supplier {
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
 }
+

@@ -16,23 +16,29 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Calendar } from "@/components/ui/calendar";
 import { useInventoryStore } from '@/store/inventory-store';
 import type { Product, PurchaseOrder } from '@/lib/types';
 import { mockPurchaseOrders } from '@/lib/mock-data';
 import { toast } from 'sonner';
-import { Save, ArrowLeft, PlusCircle, Trash2, CalendarIcon, Loader2 } from 'lucide-react';
+import { Save, ArrowLeft, PlusCircle, Trash2, CalendarIcon, Loader2, ChevronsUpDown, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useEffect, useState }
- from 'react';
+import { useEffect, useState } from 'react';
 
 const purchaseOrderItemSchema = z.object({
   productId: z.string().min(1, "Product selection is required"),
-  productName: z.string(), // Will be auto-filled
+  productName: z.string(), 
   quantityOrdered: z.coerce.number().int().min(1, "Quantity must be at least 1"),
   unitCost: z.coerce.number().min(0, "Unit cost must be non-negative"),
 });
@@ -53,6 +59,10 @@ export default function CreatePurchaseOrderPage() {
   const router = useRouter();
   const { products: inventoryProducts, fetchProducts, isLoading: inventoryLoading } = useInventoryStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // State for managing combobox open states, one for each item row
+  const [comboboxOpenStates, setComboboxOpenStates] = useState<boolean[]>([]);
+
 
   useEffect(() => {
     fetchProducts();
@@ -74,29 +84,42 @@ export default function CreatePurchaseOrderPage() {
     name: "items",
   });
 
+  useEffect(() => {
+    setComboboxOpenStates(fields.map(() => false));
+  }, [fields.length]);
+
+  const toggleCombobox = (index: number) => {
+    setComboboxOpenStates(prev => prev.map((state, i) => i === index ? !state : false));
+  };
+  
+  const setComboboxState = (index: number, isOpen: boolean) => {
+    setComboboxOpenStates(prev => prev.map((state, i) => (i === index ? isOpen : state)));
+  };
+
+
   const onSubmit = async (data: PurchaseOrderFormValues) => {
     setIsSubmitting(true);
     try {
       const totalAmount = data.items.reduce((sum, item) => sum + (item.quantityOrdered * item.unitCost), 0);
       const newPO: PurchaseOrder = {
-        id: `po${Date.now()}`, // Simple ID
+        id: `po${Date.now()}`, 
         poNumber: data.poNumber,
-        supplierId: `sup${Date.now()}`, // Placeholder
+        supplierId: `sup${Date.now()}`, 
         supplierName: data.supplierName,
         orderDate: data.orderDate.toISOString(),
         expectedDeliveryDate: data.expectedDeliveryDate?.toISOString(),
-        status: 'Draft', // Default status
+        status: 'Draft', 
         items: data.items.map(item => ({
           ...item,
           totalCost: item.quantityOrdered * item.unitCost,
         })),
         totalAmount,
-        createdBy: 'user-placeholder', // Placeholder
+        createdBy: 'user-placeholder', 
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
-      mockPurchaseOrders.push(newPO); // Add to the shared mock array
+      mockPurchaseOrders.push(newPO); 
       toast.success('Purchase Order created successfully!');
       router.push('/purchasing');
     } catch (error) {
@@ -107,23 +130,7 @@ export default function CreatePurchaseOrderPage() {
     }
   };
   
-  // Watch items to update product names
   const watchedItems = form.watch("items");
-
-  useEffect(() => {
-    watchedItems.forEach((item, index) => {
-      if (item.productId) {
-        const selectedProduct = inventoryProducts.find(p => p.id === item.productId);
-        if (selectedProduct && selectedProduct.name !== item.productName) {
-          form.setValue(`items.${index}.productName`, selectedProduct.name);
-          if (selectedProduct.costPrice && item.unitCost === 0) { // Auto-fill cost price if not set
-             form.setValue(`items.${index}.unitCost`, selectedProduct.costPrice);
-          }
-        }
-      }
-    });
-  }, [watchedItems, inventoryProducts, form]);
-
 
   return (
     <div className="flex flex-col gap-6">
@@ -234,38 +241,73 @@ export default function CreatePurchaseOrderPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {fields.map((field, index) => (
-                <div key={field.id} className="grid grid-cols-[1fr_1fr_100px_100px_auto] gap-3 items-end p-3 border rounded-md">
+                <div key={field.id} className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-3 items-end p-3 border rounded-md">
                   <FormField
                     control={form.control}
                     name={`items.${index}.productId`}
                     render={({ field: controllerField }) => (
-                      <FormItem>
+                      <FormItem className="flex flex-col">
                         <FormLabel>Product</FormLabel>
-                        <Select 
-                          onValueChange={(value) => {
-                            controllerField.onChange(value);
-                            const selectedProduct = inventoryProducts.find(p => p.id === value);
-                            form.setValue(`items.${index}.productName`, selectedProduct?.name || '');
-                            if (selectedProduct?.costPrice) {
-                               form.setValue(`items.${index}.unitCost`, selectedProduct.costPrice);
-                            }
-                          }} 
-                          defaultValue={controllerField.value}
-                          disabled={inventoryLoading}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={inventoryLoading ? "Loading..." : "Select product"} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {inventoryProducts.map(product => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} (SKU: {product.sku})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Popover open={comboboxOpenStates[index]} onOpenChange={(isOpen) => setComboboxState(index, isOpen)}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className={cn(
+                                  "w-full justify-between",
+                                  !controllerField.value && "text-muted-foreground"
+                                )}
+                                disabled={inventoryLoading}
+                              >
+                                {inventoryLoading
+                                  ? "Loading..."
+                                  : controllerField.value
+                                  ? inventoryProducts.find(
+                                      (product) => product.id === controllerField.value
+                                    )?.name
+                                  : "Select product"}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            <Command>
+                              <CommandInput placeholder="Search product..." />
+                              <CommandList>
+                                <CommandEmpty>No product found.</CommandEmpty>
+                                <CommandGroup>
+                                  {inventoryProducts.map((product) => (
+                                    <CommandItem
+                                      value={product.name}
+                                      key={product.id}
+                                      onSelect={() => {
+                                        form.setValue(`items.${index}.productId`, product.id);
+                                        form.setValue(`items.${index}.productName`, product.name);
+                                        if (product.costPrice) {
+                                          form.setValue(`items.${index}.unitCost`, product.costPrice);
+                                        } else {
+                                          form.setValue(`items.${index}.unitCost`, 0); // Default if no cost price
+                                        }
+                                        setComboboxState(index, false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          product.id === controllerField.value
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                        )}
+                                      />
+                                      {product.name} (SKU: {product.sku})
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -274,7 +316,7 @@ export default function CreatePurchaseOrderPage() {
                     control={form.control}
                     name={`items.${index}.productName`}
                     render={({ field: controllerField }) => (
-                       <FormItem className="hidden"> {/* Hidden, auto-filled */}
+                       <FormItem className="hidden">
                         <FormLabel>Product Name (hidden)</FormLabel>
                         <FormControl><Input {...controllerField} readOnly /></FormControl>
                       </FormItem>
@@ -308,7 +350,7 @@ export default function CreatePurchaseOrderPage() {
                        ${((watchedItems[index]?.quantityOrdered || 0) * (watchedItems[index]?.unitCost || 0)).toFixed(2)}
                      </p>
                    </div>
-                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive hover:text-destructive" disabled={fields.length <= 1}>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive hover:text-destructive self-center" disabled={fields.length <= 1}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -317,7 +359,10 @@ export default function CreatePurchaseOrderPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ productId: '', productName: '', quantityOrdered: 1, unitCost: 0 })}
+                onClick={() => {
+                  append({ productId: '', productName: '', quantityOrdered: 1, unitCost: 0 });
+                  setComboboxOpenStates(prev => [...prev, false]);
+                }}
                 className="mt-2"
               >
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Item
@@ -326,11 +371,11 @@ export default function CreatePurchaseOrderPage() {
                  <p className="text-sm font-medium text-destructive">{form.formState.errors.items.message}</p>
               )}
             </CardContent>
-             <CardFooter className="flex justify-between items-center border-t pt-4">
+             <CardFooter className="flex justify-between items-center border-t pt-4 mt-4">
                 <div>
                     <p className="text-sm text-muted-foreground">Grand Total</p>
                     <p className="text-xl font-bold font-headline">
-                        ${form.getValues('items').reduce((sum, item) => sum + (item.quantityOrdered * item.unitCost), 0).toFixed(2)}
+                        ${form.getValues('items').reduce((sum, item) => sum + ((item.quantityOrdered || 0) * (item.unitCost || 0)), 0).toFixed(2)}
                     </p>
                 </div>
               <div className="flex gap-2">
@@ -347,3 +392,4 @@ export default function CreatePurchaseOrderPage() {
     </div>
   );
 }
+

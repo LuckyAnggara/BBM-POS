@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
@@ -20,11 +21,53 @@ import {
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AddProductDialog } from '@/components/inventory/add-product-dialog';
+
+// Moved ProductCard to top-level for better practice, passing onDeleteClick
+const ProductCardItem = ({ product, onDeleteClick }: { product: Product; onDeleteClick: (productId: string) => void }) => (
+  <Card className="flex flex-col">
+    <CardHeader className="p-4">
+      <div className="aspect-[3/2] w-full relative overflow-hidden rounded-md mb-2">
+        <Image
+          src={product.imageUrl || "https://placehold.co/300x200.png"}
+          alt={product.name}
+          layout="fill"
+          objectFit="cover"
+          data-ai-hint="product image"
+        />
+      </div>
+      <CardTitle className="text-lg font-headline">{product.name}</CardTitle>
+      <CardDescription>{product.category} - SKU: {product.sku}</CardDescription>
+    </CardHeader>
+    <CardContent className="p-4 flex-grow">
+      <div className="flex justify-between items-center text-sm mb-1">
+        <span className="text-muted-foreground">Price:</span>
+        <span className="font-semibold">${product.price.toFixed(2)}</span>
+      </div>
+      <div className="flex justify-between items-center text-sm">
+        <span className="text-muted-foreground">Stock:</span>
+        <Badge variant={product.quantity < (product.lowStockThreshold || 10) ? "destructive" : "secondary"}>
+          {product.quantity}
+        </Badge>
+      </div>
+    </CardContent>
+    <CardFooter className="p-4 border-t">
+      <Button variant="outline" size="sm" className="mr-2 w-full">
+        <Edit className="mr-2 h-4 w-4" /> Edit
+      </Button>
+      <Button variant="destructive" size="sm" className="w-full" onClick={() => onDeleteClick(product.id)}>
+        <Trash2 className="mr-2 h-4 w-4" /> Delete
+      </Button>
+    </CardFooter>
+  </Card>
+);
+
 
 export default function InventoryPage() {
   const { products, fetchProducts, isLoading, deleteProduct } = useInventoryStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -49,44 +92,6 @@ export default function InventoryPage() {
     });
   };
 
-  const ProductCard = ({ product }: { product: Product }) => (
-    <Card className="flex flex-col">
-      <CardHeader className="p-4">
-        <div className="aspect-[3/2] w-full relative overflow-hidden rounded-md mb-2">
-          <Image
-            src={product.imageUrl || "https://placehold.co/300x200.png"}
-            alt={product.name}
-            layout="fill"
-            objectFit="cover"
-            data-ai-hint="product image"
-          />
-        </div>
-        <CardTitle className="text-lg font-headline">{product.name}</CardTitle>
-        <CardDescription>{product.category} - SKU: {product.sku}</CardDescription>
-      </CardHeader>
-      <CardContent className="p-4 flex-grow">
-        <div className="flex justify-between items-center text-sm mb-1">
-          <span className="text-muted-foreground">Price:</span>
-          <span className="font-semibold">${product.price.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between items-center text-sm">
-          <span className="text-muted-foreground">Stock:</span>
-          <Badge variant={product.quantity < (product.lowStockThreshold || 10) ? "destructive" : "secondary"}>
-            {product.quantity}
-          </Badge>
-        </div>
-      </CardContent>
-      <CardFooter className="p-4 border-t">
-        <Button variant="outline" size="sm" className="mr-2 w-full">
-          <Edit className="mr-2 h-4 w-4" /> Edit
-        </Button>
-        <Button variant="destructive" size="sm" className="w-full" onClick={() => handleDelete(product.id)}>
-          <Trash2 className="mr-2 h-4 w-4" /> Delete
-        </Button>
-      </CardFooter>
-    </Card>
-  );
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -94,7 +99,7 @@ export default function InventoryPage() {
           <h1 className="text-3xl font-headline font-semibold">Product Inventory</h1>
           <p className="text-muted-foreground">Manage your products, track stock levels, and view details.</p>
         </div>
-        <Button>
+        <Button onClick={() => setIsAddProductDialogOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" /> Add Product
         </Button>
       </div>
@@ -246,19 +251,14 @@ export default function InventoryPage() {
             ) : (
                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCardItem key={product.id} product={product} onDeleteClick={handleDelete} />
                 ))}
               </div>
             )
           )}
         </CardContent>
       </Card>
+      <AddProductDialog open={isAddProductDialogOpen} onOpenChange={setIsAddProductDialogOpen} />
     </div>
   );
 }
-
-// Placeholder for MoreHorizontal Icon if not already in lucide-react
-// const MoreHorizontal = (props: React.SVGProps<SVGSVGElement>) => (
-//   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
-// );
-// Note: MoreHorizontal is already imported from lucide-react, so the placeholder is commented out.

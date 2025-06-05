@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Edit, Trash2, Search, Filter, List, LayoutGrid } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Filter, List, LayoutGrid, MoreHorizontal } from "lucide-react";
 import Image from 'next/image';
 import { useInventoryStore } from '@/store/inventory-store';
 import type { Product } from '@/lib/types';
@@ -12,6 +12,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -257,6 +258,7 @@ export default function InventoryPage() {
 }
 
 // Placeholder for MoreHorizontal Icon if not already in lucide-react
-const MoreHorizontal = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
-);
+// const MoreHorizontal = (props: React.SVGProps<SVGSVGElement>) => (
+//   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+// );
+// Note: MoreHorizontal is already imported from lucide-react, so the placeholder is commented out.

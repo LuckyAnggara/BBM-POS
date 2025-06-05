@@ -13,6 +13,7 @@ interface InventoryState {
   updateProduct: (productId: string, updatedProductData: Partial<Product>) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
   decreaseStock: (productId: string, quantityToDecrease: number) => Promise<void>;
+  increaseStock: (productId: string, quantityToIncrease: number) => Promise<void>;
 }
 
 // Mock data
@@ -135,31 +136,42 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     toast.success(`"${productName}" deleted successfully.`);
   },
   decreaseStock: async (productId, quantityToDecrease) => {
-    // No need to set isLoading for this, it should be a quick background update
-    // Simulate API call delay if needed, but usually not for stock updates
-    // await new Promise(resolve => setTimeout(resolve, 100)); 
     set(state => {
       const product = state.products.find(p => p.id === productId);
       if (product) {
-        const newQuantity = Math.max(0, product.quantity - quantityToDecrease); // Ensure quantity doesn't go below 0
-        // if (product.quantity - quantityToDecrease < 0) {
-        //   toast.warning(`Not enough stock for ${product.name}. Stock set to 0.`);
-        // }
+        const newQuantity = Math.max(0, product.quantity - quantityToDecrease);
         
         const updatedProducts = state.products.map(p =>
           p.id === productId ? { ...p, quantity: newQuantity, updatedAt: new Date().toISOString() } : p
         );
 
-        // Update mockProducts array as well
         const mockIndex = mockProducts.findIndex(p => p.id === productId);
         if (mockIndex !== -1) {
           mockProducts[mockIndex] = { ...mockProducts[mockIndex], quantity: newQuantity, updatedAt: new Date().toISOString() };
         }
-        // console.log(`Stock for ${product.name} decreased by ${quantityToDecrease}. New quantity: ${newQuantity}`);
         return { products: updatedProducts };
       }
-      return state; // No change if product not found
+      return state;
     });
-    // No toast here, POS checkout will give overall success
+  },
+  increaseStock: async (productId, quantityToIncrease) => {
+    set(state => {
+      const product = state.products.find(p => p.id === productId);
+      if (product) {
+        const newQuantity = product.quantity + quantityToIncrease;
+        
+        const updatedProducts = state.products.map(p =>
+          p.id === productId ? { ...p, quantity: newQuantity, updatedAt: new Date().toISOString() } : p
+        );
+
+        const mockIndex = mockProducts.findIndex(p => p.id === productId);
+        if (mockIndex !== -1) {
+          mockProducts[mockIndex] = { ...mockProducts[mockIndex], quantity: newQuantity, updatedAt: new Date().toISOString() };
+        }
+        // console.log(`Stock for ${product.name} increased by ${quantityToIncrease}. New quantity: ${newQuantity}`);
+        return { products: updatedProducts };
+      }
+      return state;
+    });
   },
 }));

@@ -19,83 +19,26 @@ import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useInventoryStore } from '@/store/inventory-store';
-
-const mockPurchaseOrders: PurchaseOrder[] = [
-  {
-    id: 'po1',
-    poNumber: 'PO2024-001',
-    supplierId: 'sup1',
-    supplierName: 'Fresh Farms Inc.',
-    orderDate: new Date('2024-07-15').toISOString(),
-    expectedDeliveryDate: new Date('2024-07-20').toISOString(),
-    status: 'Received',
-    items: [
-      { productId: '1', productName: 'Organic Apples', quantityOrdered: 50, unitCost: 1.50, totalCost: 75.00, quantityReceived: 50 },
-    ],
-    totalAmount: 75.00,
-    createdBy: 'user1',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'po2',
-    poNumber: 'PO2024-002',
-    supplierId: 'sup2',
-    supplierName: 'Artisan Bakers Co.',
-    orderDate: new Date('2024-07-18').toISOString(),
-    expectedDeliveryDate: new Date('2024-07-25').toISOString(),
-    status: 'Ordered',
-    items: [
-      { productId: '2', productName: 'Whole Wheat Bread', quantityOrdered: 30, unitCost: 2.20, totalCost: 66.00 },
-    ],
-    totalAmount: 66.00,
-    createdBy: 'user1',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'po3',
-    poNumber: 'PO2024-003',
-    supplierId: 'sup1',
-    supplierName: 'Fresh Farms Inc.',
-    orderDate: new Date('2024-07-20').toISOString(),
-    status: 'Pending Approval',
-    items: [
-      { productId: '1', productName: 'Organic Apples', quantityOrdered: 20, unitCost: 1.50, totalCost: 30.00 },
-      { productId: '3', productName: 'Free-Range Eggs', quantityOrdered: 10, unitCost: 3.00, totalCost: 30.00 },
-    ],
-    totalAmount: 60.00,
-    createdBy: 'user1',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-const statusColors: Record<PurchaseOrder['status'], string> = {
-  'Draft': 'bg-gray-200 text-gray-700',
-  'Pending Approval': 'bg-yellow-200 text-yellow-800',
-  'Approved': 'bg-blue-200 text-blue-800',
-  'Ordered': 'bg-indigo-200 text-indigo-800',
-  'Shipped': 'bg-purple-200 text-purple-800',
-  'Partially Received': 'bg-orange-200 text-orange-800',
-  'Received': 'bg-green-200 text-green-800',
-  'Cancelled': 'bg-red-200 text-red-800',
-  'Closed': 'bg-gray-400 text-gray-900',
-};
-
+import Link from 'next/link';
+import { mockPurchaseOrders, purchaseOrderStatusColors } from '@/lib/mock-data'; // Updated import
 
 export default function PurchasingPage() {
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(mockPurchaseOrders); // Initialize with mock data
+  // Initialize state with the imported mockPurchaseOrders
+  // Note: For changes from other pages (like create) to reflect without a store,
+  // this component might need a way to re-fetch or re-initialize its state.
+  // For now, it will show the initial state + any POs added/deleted directly to the mockPurchaseOrders array
+  // if this page is re-mounted or if we manage to trigger a re-render based on `mockPurchaseOrders` reference.
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { increaseStock, fetchProducts: fetchInventoryProducts } = useInventoryStore();
 
   useEffect(() => {
-    // Simulate API call for POs if needed, for now just use mock
-    // If POs were fetched, setIsLoading would be set accordingly
     fetchInventoryProducts(); // Ensure inventory products are loaded for stock updates
-    setIsLoading(false); // Assuming POs are loaded or mock is used
-  }, [fetchInventoryProducts]);
+    // Set purchaseOrders from the potentially modified mock array
+    setPurchaseOrders([...mockPurchaseOrders]); 
+    setIsLoading(false);
+  }, [fetchInventoryProducts]); // Rerun if fetchInventoryProducts changes, or on mount.
 
   const filteredPurchaseOrders = purchaseOrders.filter(po =>
     po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -107,10 +50,11 @@ export default function PurchasingPage() {
       action: {
         label: 'Delete',
         onClick: () => {
+          const indexToDelete = mockPurchaseOrders.findIndex(po => po.id === poId);
+          if (indexToDelete > -1) {
+            mockPurchaseOrders.splice(indexToDelete, 1);
+          }
           setPurchaseOrders(prev => prev.filter(po => po.id !== poId));
-          // Also update mockPurchaseOrders if it's the source of truth for the session
-          const mockIndex = mockPurchaseOrders.findIndex(p => p.id === poId);
-          if (mockIndex !== -1) mockPurchaseOrders.splice(mockIndex, 1);
           toast.success('Purchase order deleted.');
         },
       },
@@ -133,29 +77,22 @@ export default function PurchasingPage() {
     }
 
     try {
-      // Increase stock for each item in the PO
       for (const item of po.items) {
         await increaseStock(item.productId, item.quantityOrdered);
-        // Optionally update item.quantityReceived here if your PO model supports it
       }
 
-      // Update PO status locally
-      setPurchaseOrders(prevPOs =>
-        prevPOs.map(p =>
-          p.id === poId ? { ...p, status: 'Received', updatedAt: new Date().toISOString() } : p
-        )
+      const updatedPOs = purchaseOrders.map(p =>
+        p.id === poId ? { ...p, status: 'Received', updatedAt: new Date().toISOString() } : p
       );
-      // Update mockPurchaseOrders array as well
+      setPurchaseOrders(updatedPOs);
+      
       const mockIndex = mockPurchaseOrders.findIndex(p => p.id === poId);
       if (mockIndex !== -1) {
         mockPurchaseOrders[mockIndex] = { ...mockPurchaseOrders[mockIndex], status: 'Received', updatedAt: new Date().toISOString()};
-         // Update quantityReceived for items in mockPurchaseOrders for consistency if needed
         mockPurchaseOrders[mockIndex].items.forEach(item => {
             item.quantityReceived = item.quantityOrdered;
         });
       }
-
-
       toast.success(`Items for PO ${po.poNumber} received and stock updated.`);
     } catch (error) {
       toast.error("Failed to update stock. Please check console for errors.");
@@ -171,9 +108,11 @@ export default function PurchasingPage() {
           <h1 className="text-3xl font-headline font-semibold">Purchase Orders</h1>
           <p className="text-muted-foreground">Create, manage, and track your purchase orders.</p>
         </div>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Create New PO
-        </Button>
+        <Link href="/purchasing/create" passHref>
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" /> Create New PO
+          </Button>
+        </Link>
       </div>
 
       <Card>
@@ -245,7 +184,7 @@ export default function PurchasingPage() {
                     <TableCell>{po.supplierName}</TableCell>
                     <TableCell>{format(parseISO(po.orderDate), 'MMM dd, yyyy')}</TableCell>
                     <TableCell>
-                      <Badge className={`${statusColors[po.status] || 'bg-gray-200 text-gray-700'} px-2 py-1 text-xs font-medium rounded-full`}>
+                      <Badge className={`${purchaseOrderStatusColors[po.status] || 'bg-gray-200 text-gray-700'} px-2 py-1 text-xs font-medium rounded-full`}>
                         {po.status}
                       </Badge>
                     </TableCell>
@@ -258,11 +197,15 @@ export default function PurchasingPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem disabled> {/* Future: Link to PO detail page */}
-                            <Eye className="mr-2 h-4 w-4" /> View Details
+                          <DropdownMenuItem asChild>
+                             <Link href={`/purchasing/${po.id}`}> {/* Updated Link */}
+                                <Eye className="mr-2 h-4 w-4" /> View Details
+                              </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem disabled> {/* Future: Link to PO edit page */}
-                            <Edit className="mr-2 h-4 w-4" /> Edit PO
+                          <DropdownMenuItem asChild>
+                            <Link href={`/purchasing/${po.id}/edit`}> {/* Updated Link */}
+                              <Edit className="mr-2 h-4 w-4" /> Edit PO
+                            </Link>
                           </DropdownMenuItem>
                            <DropdownMenuItem
                             onClick={() => handleReceivePO(po.id)}

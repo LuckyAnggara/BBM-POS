@@ -156,7 +156,7 @@ export function CartDisplay() {
                   />
                   <div className="flex-grow">
                     <h4 className="font-semibold text-sm" title={item.name}>{item.name}</h4>
-                    <p className="text-xs text-muted-foreground">{(getProductById(item.productId)?.category || 'Item')} - Size: XS - Color: Blue</p> {/* Placeholder details */}
+                    <p className="text-xs text-muted-foreground">{(getProductById(item.productId)?.category?.name || 'Item')} - Size: XS - Color: Blue</p> {/* Placeholder details */}
                     <p className="text-sm font-bold mt-0.5">${item.price.toFixed(2)}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
@@ -299,3 +299,5 @@ export function CartDisplay() {
     </Card>
   );
 }
+
+    

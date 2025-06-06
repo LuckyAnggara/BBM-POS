@@ -2,10 +2,9 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import type { Customer, Sale, SaleItem, CartItem, SaleDataForCreation } from '@/lib/types'; // Make sure SaleDataForCreation and SaleItemDataForCreation are defined in types.ts
+import type { Customer, Sale, CartItem, SaleDataForCreation, Product } from '@/lib/types'; 
 import { revalidatePath } from 'next/cache';
 
-// Helper to map Prisma Customer to App Customer
 const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer => {
   return {
     ...dbCustomer,
@@ -14,7 +13,16 @@ const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer => {
   };
 };
 
-// Helper to map Prisma Sale to App Sale
+const mapPrismaUserToAppUser = (prismaUser: any): User => {
+  return {
+    ...prismaUser,
+    role: prismaUser.role,
+    lastLogin: prismaUser.lastLogin?.toISOString() || null,
+    createdAt: prismaUser.createdAt.toISOString(),
+    updatedAt: prismaUser.updatedAt.toISOString(),
+  };
+};
+
 const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
     return {
       ...dbSale,
@@ -23,12 +31,25 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
       updatedAt: dbSale.updatedAt.toISOString(),
       items: dbSale.items.map((item: any) => ({
         ...item,
+        costPriceAtSale: item.costPriceAtSale !== null ? parseFloat(item.costPriceAtSale) : null,
+        unitPrice: parseFloat(item.unitPrice),
+        totalPrice: parseFloat(item.totalPrice),
+        product: item.product ? {
+            ...item.product,
+            price: parseFloat(item.product.price),
+            costPrice: item.product.costPrice !== null ? parseFloat(item.product.costPrice) : null,
+        } : undefined,
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),
       })),
-      // Customer and User relations might be included or fetched separately as needed
       customer: dbSale.customer ? mapPrismaCustomerToAppCustomer(dbSale.customer) : null,
-      // user: dbSale.user ? mapPrismaUserToAppUser(dbSale.user) : undefined, // Assuming mapPrismaUserToAppUser exists
+      user: dbSale.user ? mapPrismaUserToAppUser(dbSale.user) : undefined,
+      subtotal: parseFloat(dbSale.subtotal),
+      discountAmount: parseFloat(dbSale.discountAmount),
+      taxPercent: parseFloat(dbSale.taxPercent),
+      taxAmount: parseFloat(dbSale.taxAmount),
+      shippingCost: parseFloat(dbSale.shippingCost),
+      grandTotal: parseFloat(dbSale.grandTotal),
     };
   };
 
@@ -39,12 +60,9 @@ export async function findOrCreateCustomer(
 ): Promise<Customer> {
   try {
     if (!name.trim()) {
-        // Handle as guest or throw error if name is mandatory
-        // For now, let's try to find a generic "Guest Customer" or create one if specific name is not provided.
-        // This logic might need refinement based on business rules for guest checkouts.
         const guestName = "Guest Customer";
         let customer = await prisma.customer.findFirst({
-            where: { name: guestName, email: null, phone: null }, // A more specific guest signature
+            where: { name: guestName, email: null, phone: null }, 
         });
         if (!customer) {
             customer = await prisma.customer.create({
@@ -54,9 +72,6 @@ export async function findOrCreateCustomer(
         return mapPrismaCustomerToAppCustomer(customer);
     }
 
-
-    // Try to find by email if provided and unique, otherwise by name.
-    // This logic can be more sophisticated (e.g., fuzzy matching name, preferring email match).
     let customer;
     if (email) {
       customer = await prisma.customer.findUnique({
@@ -64,18 +79,17 @@ export async function findOrCreateCustomer(
       });
     }
 
-    if (!customer) {
+    if (!customer && name) { // Ensure name is not empty if email wasn't found/provided
       customer = await prisma.customer.findFirst({
-        where: { name }, // This could lead to duplicates if names aren't unique.
-                         // Consider more robust matching or making email mandatory for non-guests.
+        where: { name }, 
       });
     }
-
+    
     if (!customer) {
       customer = await prisma.customer.create({
         data: {
           name,
-          email: email || null, // Ensure email is explicitly null if not provided
+          email: email || null, 
           phone,
         },
       });
@@ -105,8 +119,26 @@ export async function recordSale(
   try {
     const { 
         cartItems, customerId, userId, 
-        subtotal, discountAmount = 0, taxPercent = 0, shippingCost = 0, customerName 
+        subtotal, discountAmount = 0, taxPercent = 0, shippingCost = 0, 
+        customerName, paymentMethod, status = "Completed" // Default status
     } = saleData;
+
+    // Fetch cost prices for all products in the cart
+    const productIds = cartItems.map(item => item.productId);
+    const productsInDb = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, costPrice: true },
+    });
+    const costPriceMap = new Map(productsInDb.map(p => [p.id, p.costPrice]));
+
+    const saleItemsData = cartItems.map((item: CartItem) => ({
+      productId: item.productId,
+      productName: item.name, 
+      quantity: item.quantity,
+      unitPrice: item.price, 
+      totalPrice: item.price * item.quantity,
+      costPriceAtSale: costPriceMap.get(item.productId) ?? item.costPrice ?? null, // Use fetched cost price, fallback to cartItem's costPrice if available (e.g. if cart store pre-fetches)
+    }));
 
     const taxableAmount = Math.max(0, subtotal - discountAmount);
     const taxAmountValue = taxableAmount * (taxPercent / 100);
@@ -123,17 +155,13 @@ export async function recordSale(
         taxAmount: taxAmountValue,
         shippingCost,
         grandTotal: grandTotalValue,
-        customerName: customerName, // Use the name from SaleDataForCreation
-        ...(customerId && { customerId: customerId }), // Connect to customer if ID is provided
+        customerName: customerName, 
+        paymentMethod,
+        status,
+        ...(customerId && { customerId: customerId }), 
         userId,
         items: {
-          create: cartItems.map((item: CartItem) => ({
-            productId: item.productId,
-            productName: item.name, // Denormalized name
-            quantity: item.quantity,
-            unitPrice: item.price, // Price at the time of sale
-            totalPrice: item.price * item.quantity,
-          })),
+          create: saleItemsData,
         },
       },
       include: { 
@@ -143,22 +171,19 @@ export async function recordSale(
         },
     });
 
-    revalidatePath('/pos'); // Potentially revalidate other paths like sales history later
-    // Revalidate product paths if stock changes are tied here or done separately
+    revalidatePath('/pos');
+    revalidatePath('/sales/history'); // Revalidate sales history page
     cartItems.forEach(item => {
         revalidatePath(`/inventory/${item.productId}`);
     });
     revalidatePath('/inventory');
 
-
     return mapPrismaSaleToAppSale(createdSale);
   } catch (error) {
     console.error('Failed to record sale:', error);
-    // Consider more specific error handling or re-throwing
     if (error instanceof Error) {
         if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('saleNumber')) {
-            // Highly unlikely due to timestamp and random suffix, but handle unique constraint violation for saleNumber
-             console.error('Sale number collision, this should be very rare. Consider retrying or adjusting generation.', error);
+             console.error('Sale number collision, this should be very rare.');
              throw new Error('Failed to generate a unique sale number. Please try again.');
         }
     }

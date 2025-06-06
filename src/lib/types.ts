@@ -10,7 +10,6 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
-  // category: string; // Replaced by category relation
   quantity: number;
   price: number;
   costPrice?: number | null;
@@ -21,10 +20,10 @@ export interface Product {
   lowStockThreshold?: number | null;
   
   categoryId?: string | null;
-  category?: Category | null; // For eager loading
+  category?: Category | null; 
 
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  createdAt: string; 
+  updatedAt: string; 
 }
 
 export interface CartItem {
@@ -33,7 +32,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   imageUrl?: string | null;
-  // categoryName?: string | null; // If needed in cart from Product.category.name
+  costPrice?: number | null; // Added to cart item to carry over to SaleItem
 }
 
 export type PurchaseOrderStatus = string;
@@ -97,7 +96,7 @@ export interface Supplier {
 }
 
 export interface AppSettings extends Omit<PrismaAppSettings, 'createdAt' | 'updatedAt' | 'defaultTaxRate'> {
-  defaultTaxRate: number; // Ensure this is number, Prisma model uses Float
+  defaultTaxRate: number; 
   createdAt: string; 
   updatedAt: string; 
 }
@@ -108,17 +107,20 @@ export interface Customer extends Omit<PrismaCustomer, 'createdAt' | 'updatedAt'
   updatedAt: string;
 }
 
-export interface SaleItem extends Omit<PrismaSaleItem, 'createdAt' | 'updatedAt' | 'sale' | 'product'> {
-  product?: Product; // For potential display purposes, though productId is the FK
+export interface SaleItem extends Omit<PrismaSaleItem, 'createdAt' | 'updatedAt' | 'sale' | 'product' | 'costPriceAtSale'> {
+  product?: Product; 
+  costPriceAtSale?: number | null; // Ensure this is number
   createdAt: string;
   updatedAt: string;
 }
 
-export interface Sale extends Omit<PrismaSale, 'createdAt' | 'updatedAt' | 'saleDate' | 'customer' | 'user' | 'items'> {
+export interface Sale extends Omit<PrismaSale, 'createdAt' | 'updatedAt' | 'saleDate' | 'customer' | 'user' | 'items' | 'status'> {
   saleDate: string; // ISO date string
   customer?: Customer | null;
   user?: User; // Cashier/Seller
   items: SaleItem[];
+  status: string; // Not optional, will default to "Completed"
+  paymentMethod?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -126,8 +128,10 @@ export interface Sale extends Omit<PrismaSale, 'createdAt' | 'updatedAt' | 'sale
 // For creating a sale
 export type SaleItemDataForCreation = Omit<SaleItem, 'id' | 'createdAt' | 'updatedAt' | 'saleId'>;
 
-export type SaleDataForCreation = Omit<Sale, 'id' | 'saleNumber' | 'createdAt' | 'updatedAt' | 'items' | 'user' | 'customer' | 'saleDate'> & {
-  customerId?: string; // Will pass customerId directly
-  userId: string; // Will pass userId directly
-  cartItems: CartItem[]; // For easier processing of cart items into SaleItemDataForCreation
+export type SaleDataForCreation = Omit<Sale, 'id' | 'saleNumber' | 'createdAt' | 'updatedAt' | 'items' | 'user' | 'customer' | 'saleDate' | 'status'> & {
+  customerId?: string; 
+  userId: string; 
+  cartItems: CartItem[]; 
+  paymentMethod: string; // Made non-optional as it's collected from POS
+  status?: string; // Optional for creation, defaults in action
 };

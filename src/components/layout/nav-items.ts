@@ -18,7 +18,9 @@ import {
   History,
   HelpCircle,
   FolderKanban,
-  SlidersHorizontal
+  SlidersHorizontal,
+  DollarSign, // For Sales
+  TrendingUp // For Reports
 } from 'lucide-react';
 
 export interface NavSubItem {
@@ -47,14 +49,14 @@ export const sidebarNavGroups: NavGroup[] = [
     groupTitle: 'Platform',
     items: [
       {
-        label: 'Playground', // Maps to Dashboard
+        label: 'Playground', 
         icon: LayoutDashboard,
         href: '/',
         isActive: (pathname) => pathname === '/',
       },
       {
         label: 'Inventory Models',
-        icon: FolderKanban,
+        icon: FolderKanban, // Using FolderKanban for "Inventory" like group
         isInitiallyOpen: false,
         subItems: [
           {
@@ -63,34 +65,41 @@ export const sidebarNavGroups: NavGroup[] = [
             icon: Package,
             isActive: (pathname) => pathname === '/inventory' || pathname.startsWith('/inventory/add') || /^\/inventory\/[^/]+(\/edit)?$/.test(pathname),
           },
-          // { href: '/inventory/categories-overview', label: 'Categories View', icon: ListTree }, // Example
         ],
         isActive: (pathname) => pathname.startsWith('/inventory'),
       },
       {
-        label: 'System Settings', // Maps to Admin Settings
+        label: 'Sales & Reports',
+        icon: BarChart3, 
+        isInitiallyOpen: false,
+        subItems: [
+          { href: '/sales/history', label: 'Sales History', icon: History },
+          // { href: '/reports/profit-loss', label: 'Profit & Loss', icon: TrendingUp },
+        ],
+        isActive: (pathname) => pathname.startsWith('/sales') || pathname.startsWith('/reports'),
+      },
+      {
+        label: 'System Settings', 
         icon: Settings,
         href: '/admin/settings',
         isActive: (pathname) => pathname === '/admin/settings',
       },
-      // Placeholders from image example
       { label: 'History', icon: History, href: '#history-placeholder' },
       { label: 'Starred', icon: Star, href: '#starred-placeholder' },
       { label: 'Documentation', icon: HelpCircle, href: '#docs-placeholder' },
     ],
   },
   {
-    groupTitle: 'Projects', // Placeholder group from image
+    groupTitle: 'Projects', 
     items: [
       { label: 'Design Engineering', icon: PenTool, href: '#design-placeholder' },
-      { label: 'Sales & Marketing', icon: BarChart3, href: '#sales-placeholder' },
+      { label: 'Sales & Marketing', icon: BarChart3, href: '#sales-market-placeholder' }, // Made unique
       { label: 'Travel', icon: Plane, href: '#travel-placeholder' },
       { label: 'More', icon: MoreHorizontal, href: '#more-projects-placeholder' },
     ],
   },
 ];
 
-// Standalone items (not under a group title in the new design, but essential for the app)
 export const standaloneNavItems: NavItem[] = [
   {
     href: '/pos',
@@ -114,7 +123,6 @@ export const standaloneNavItems: NavItem[] = [
       { href: '/admin/products', label: 'Product Catalog', icon: Package, isActive: (pathname) => pathname === '/admin/products' },
       { href: '/admin/categories', label: 'Categories', icon: ListTree, isActive: (pathname) => pathname === '/admin/categories' },
     ],
-    // isActive for the main Admin Tools item if any of its subItems are active, excluding settings
     isActive: (pathname) => pathname.startsWith('/admin') && pathname !== '/admin/settings',
   },
 ];

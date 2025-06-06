@@ -6,14 +6,16 @@ import { toast } from 'sonner';
 interface CartState {
   items: CartItem[];
   discountAmount: number;
-  taxPercent: number; // Stored as a whole number, e.g., 10 for 10%
+  taxPercent: number; 
   shippingCost: number;
+  paymentMethod: string; // Added to store selected payment method
   addItem: (product: Product, quantity?: number) => void;
   removeItem: (productId: string) => void;
   updateItemQuantity: (productId: string, quantity: number) => void;
   setDiscountAmount: (amount: number) => void;
-  setTaxPercent: (percent: number) => void; // Action to set tax rate, will be called from component
+  setTaxPercent: (percent: number) => void; 
   setShippingCost: (cost: number) => void;
+  setPaymentMethod: (method: string) => void; // Added setter
   clearCart: () => void;
   totalItems: () => number;
   subtotal: () => number;
@@ -23,8 +25,9 @@ interface CartState {
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   discountAmount: 0,
-  taxPercent: 0, // Initialized to 0, will be updated from app settings
+  taxPercent: 0, 
   shippingCost: 0,
+  paymentMethod: 'Cash', // Default payment method
   addItem: (product, quantity = 1) => {
     set(state => {
       const existingItem = state.items.find(item => item.productId === product.id);
@@ -44,6 +47,7 @@ export const useCartStore = create<CartState>((set, get) => ({
             price: product.price,
             quantity,
             imageUrl: product.imageUrl,
+            costPrice: product.costPrice, // Store cost price in cart item
           },
         ];
       }
@@ -83,10 +87,11 @@ export const useCartStore = create<CartState>((set, get) => ({
   setDiscountAmount: (amount) => set({ discountAmount: Math.max(0, amount) }),
   setTaxPercent: (percent) => set({ taxPercent: Math.max(0, percent) }),
   setShippingCost: (cost) => set({ shippingCost: Math.max(0, cost) }),
+  setPaymentMethod: (method) => set({ paymentMethod: method }),
   clearCart: () => {
-    // Keep the taxPercent from settings, reset other cart-specific values
     const currentTax = get().taxPercent;
-    set({ items: [], discountAmount: 0, shippingCost: 0, taxPercent: currentTax });
+    const currentPaymentMethod = get().paymentMethod; // Persist payment method preference
+    set({ items: [], discountAmount: 0, shippingCost: 0, taxPercent: currentTax, paymentMethod: currentPaymentMethod });
     toast.info('Cart cleared.');
   },
   totalItems: () => {

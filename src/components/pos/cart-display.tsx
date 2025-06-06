@@ -2,22 +2,21 @@
 'use client';
 import { useCartStore } from '@/store/cart-store';
 import { useInventoryStore } from '@/store/inventory-store';
-import type { CartItem, SaleDataForCreation, Customer, AppSettings } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import type { CartItem, SaleDataForCreation, Customer } from '@/lib/types';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2, User as UserIcon, Percent, XCircle, DollarSign } from 'lucide-react'; // Changed LogOut to XCircle
+import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2, User as UserIcon, Percent, XCircle, DollarSign } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
-import { findOrCreateCustomer, recordSale } from '@/app/pos/actions'; // Corrected path
-import { fetchAppSettings } from '@/app/admin/settings/actions'; // Ensured precise (app)path
+import { findOrCreateCustomer, recordSale } from '@/app/pos/actions';
+import { fetchAppSettings } from '@/app/admin/settings/actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
-
 
 const MOCK_USER_ID = 'user_staff_charlie'; 
 
@@ -27,7 +26,8 @@ export function CartDisplay() {
     subtotal, grandTotal,
     discountAmount, setDiscountAmount,
     taxPercent, setTaxPercent,
-    shippingCost, setShippingCost
+    shippingCost, setShippingCost,
+    paymentMethod, setPaymentMethod // Get paymentMethod and its setter
   } = useCartStore();
   const { decreaseStock, getProductById } = useInventoryStore();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -95,6 +95,8 @@ export function CartDisplay() {
       shippingCost,
       customerName: customerName.trim() || undefined, 
       customerId: foundCustomer?.id || undefined,
+      paymentMethod: paymentMethod, // Pass selected payment method
+      // status will default to "Completed" in the server action
     };
     try {
       const recordedSale = await recordSale(saleDataPayload);
@@ -107,6 +109,7 @@ export function CartDisplay() {
       clearCart();
       setCustomerName('');
       setPromoCode('');
+      // Payment method will persist in store, no need to reset here unless desired
     } catch (error) {
         toast.error("An error occurred during checkout. Please try again.");
         console.error("Checkout error:", error);
@@ -272,27 +275,33 @@ export function CartDisplay() {
             <Button variant="outline" className="h-9 text-xs px-3" onClick={() => toast.info("Promo code applied (placeholder).")} disabled={isCheckingOut || !promoCode}>Apply</Button>
           </div>
 
-          <Select defaultValue="visa" disabled={isCheckingOut}>
+          <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={isCheckingOut}>
             <SelectTrigger className="w-full h-9 text-xs">
                 <SelectValue placeholder="Select payment method" />
             </SelectTrigger>
             <SelectContent>
-                <SelectItem value="visa">
+                <SelectItem value="Cash">
                     <div className="flex items-center gap-2 text-xs">
-                        <CreditCard className="h-3.5 w-3.5"/> 
+                        <DollarSign className="h-3.5 w-3.5"/> 
+                        Cash
+                    </div>
+                </SelectItem>
+                <SelectItem value="Credit Card">
+                     <div className="flex items-center gap-2 text-xs">
+                        <CreditCard className="h-3.5 w-3.5"/>
+                        Credit Card
+                    </div>
+                </SelectItem>
+                <SelectItem value="VISA">
+                     <div className="flex items-center gap-2 text-xs">
+                        <CreditCard className="h-3.5 w-3.5"/>
                         VISA
                     </div>
                 </SelectItem>
-                <SelectItem value="mastercard">
+                <SelectItem value="Mastercard">
                      <div className="flex items-center gap-2 text-xs">
                         <CreditCard className="h-3.5 w-3.5"/>
                         Mastercard
-                    </div>
-                </SelectItem>
-                <SelectItem value="cash">
-                     <div className="flex items-center gap-2 text-xs">
-                        <DollarSign className="h-3.5 w-3.5"/>
-                        Cash
                     </div>
                 </SelectItem>
             </SelectContent>
@@ -308,5 +317,3 @@ export function CartDisplay() {
     </Card>
   );
 }
-
-    

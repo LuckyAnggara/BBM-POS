@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   DollarSign,
   TrendingUp,
+  Plus,
   History as HistoryIcon,
   FileText,
   ReceiptText, // For Expenses
@@ -86,7 +87,7 @@ export const sidebarNavGroups: NavGroup[] = [
         isInitiallyOpen: false,
         subItems: [
           { href: '/expenses', label: 'Expense Log', icon: HistoryIcon },
-          { href: '/expenses/add', label: 'Add New Expense', icon: PlusCircle }, // Using the helper below
+          { href: '/expenses/add', label: 'Add New Expense', icon: Plus }, // Using the helper below
         ],
         isActive: (pathname) => pathname.startsWith('/expenses'),
       },

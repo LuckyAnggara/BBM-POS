@@ -14,20 +14,21 @@ import {
   SidebarMenuButton,
   SidebarMenuSub,
   SidebarMenuSubButton,
+  SidebarMenuSubItem, // Added SidebarMenuSubItem here
   SidebarGroup,
   SidebarGroupLabel,
-  useSidebar, // Import useSidebar
+  useSidebar, 
 } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 
 import { ChevronRight, type LucideIcon } from 'lucide-react';
-import Link from 'next/link'; // Import Link
+import Link from 'next/link'; 
 import { usePathname } from 'next/navigation';
 import { TeamSwitcher } from './team-switcher';
 import { NavUser } from './nav-user';
 import type { User } from '@/lib/types';
-import { sidebarNavGroups, standaloneNavItems, type NavItem, type NavSubItem } from './nav-items.tsx'; // Import nav items configuration, ensure .tsx
+import { sidebarNavGroups, standaloneNavItems, type NavItem, type NavSubItem } from './nav-items.tsx'; 
 
 interface AppShellProps {
   children: ReactNode;
@@ -42,7 +43,7 @@ const shopData = {
 
 
 function NavItemDisplay({ item, pathname }: { item: NavItem; pathname: string }) {
-  const { isMobile } = useSidebar(); // Access sidebar context
+  const { isMobile } = useSidebar(); 
 
   // Determine if item is active based on its own isActive or subItems' isActive
   const isActive = item.isActive ? item.isActive(pathname) : 

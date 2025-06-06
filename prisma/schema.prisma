@@ -1,4 +1,3 @@
-
 datasource db {
   provider = "sqlite"
   url      = "file:./dev.db"
@@ -9,24 +8,24 @@ generator client {
 }
 
 model Product {
-  id                String            @id @default(cuid())
-  name              String
-  sku               String            @unique
-  quantity          Int
-  price             Decimal
-  costPrice         Decimal?
-  supplier          String?
-  description       String?
-  imageUrl          String?
-  tags              Json? // Store as JSON array of strings e.g., ["tag1", "tag2"]
-  lowStockThreshold Int?              @default(10)
-  categoryId        String?
-  category          Category?         @relation(fields: [categoryId], references: [id])
-  saleItems         SaleItem[]
+  id                 String              @id @default(cuid())
+  name               String
+  sku                String              @unique
+  quantity           Int
+  price              Decimal
+  costPrice          Decimal?
+  supplier           String?
+  description        String?
+  imageUrl           String?
+  tags               Json?
+  lowStockThreshold  Int?                @default(10)
+  categoryId         String?
+  category           Category?           @relation(fields: [categoryId], references: [id])
+  saleItems          SaleItem[]
   purchaseOrderItems PurchaseOrderItem[]
-  stockMovements    StockMovement[]
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  stockMovements     StockMovement[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }
 
 model Category {
@@ -38,19 +37,19 @@ model Category {
 }
 
 model User {
-  id          String    @id @default(cuid())
-  name        String
-  email       String    @unique
-  password    String // Added password field
-  role        String    // Consider Enum if roles are fixed: enum UserRole { ADMIN STAFF MANAGER }
-  avatarUrl   String?
-  isActive    Boolean   @default(true)
-  lastLogin   DateTime?
-  sales       Sale[]
+  id             String          @id @default(cuid())
+  name           String
+  email          String          @unique
+  password       String 
+  role           String 
+  avatarUrl      String?
+  isActive       Boolean         @default(true)
+  lastLogin      DateTime?
+  sales          Sale[]
   purchaseOrders PurchaseOrder[] @relation(name: "PurchaseOrdersByUser")
   stockMovements StockMovement[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 }
 
 model Customer {
@@ -69,9 +68,9 @@ model Sale {
   saleNumber     String     @unique // Auto-generated or manually entered
   saleDate       DateTime   @default(now())
   customerId     String?
-  customerName   String?    // Denormalized for quick display
+  customerName   String? // Denormalized for quick display
   customer       Customer?  @relation(fields: [customerId], references: [id])
-  userId         String?    // Cashier/Seller ID
+  userId         String? // Cashier/Seller ID
   user           User?      @relation(fields: [userId], references: [id])
   subtotal       Decimal
   discountAmount Decimal    @default(0)
@@ -80,7 +79,7 @@ model Sale {
   shippingCost   Decimal    @default(0)
   grandTotal     Decimal
   paymentMethod  String?
-  status         String     // e.g., "PendingPayment", "Completed", "Refunded", "Cancelled"
+  status         String // e.g., "PendingPayment", "Completed", "Refunded", "Cancelled"
   notes          String?
   items          SaleItem[]
   createdAt      DateTime   @default(now())
@@ -92,11 +91,11 @@ model SaleItem {
   saleId          String
   sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
   productId       String
-  productName     String   // Denormalized product name at time of sale
+  productName     String // Denormalized product name at time of sale
   product         Product? @relation(fields: [productId], references: [id], onDelete: Restrict) // Prevent product deletion if in sale
   quantity        Int
-  unitPrice       Decimal  // Price per unit at time of sale
-  totalPrice      Decimal  // quantity * unitPrice
+  unitPrice       Decimal // Price per unit at time of sale
+  totalPrice      Decimal // quantity * unitPrice
   costPriceAtSale Decimal? // Cost price per unit at time of sale for profit calculation
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -108,7 +107,7 @@ model PurchaseOrder {
   supplierName         String
   orderDate            DateTime
   expectedDeliveryDate DateTime?
-  status               String              // e.g., "Draft", "Ordered", "Shipped", "Received", "Cancelled"
+  status               String // e.g., "Draft", "Ordered", "Shipped", "Received", "Cancelled"
   items                PurchaseOrderItem[]
   discountAmount       Decimal?
   shippingCost         Decimal?
@@ -123,18 +122,18 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id                String         @id @default(cuid())
-  purchaseOrderId   String
-  purchaseOrder     PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  productId         String
-  productName       String         // Denormalized product name
-  product           Product?       @relation(fields: [productId], references: [id], onDelete: Restrict)
-  quantityOrdered   Int
-  quantityReceived  Int?
-  unitCost          Decimal
-  totalCost         Decimal        // quantityOrdered * unitCost
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id               String        @id @default(cuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId        String
+  productName      String // Denormalized product name
+  product          Product?      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantityOrdered  Int
+  quantityReceived Int?
+  unitCost         Decimal
+  totalCost        Decimal // quantityOrdered * unitCost
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 }
 
 enum StockMovementType {
@@ -154,26 +153,30 @@ model StockMovement {
   productId      String
   product        Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
   type           StockMovementType
-  quantityChange Int               // Positive for increase, negative for decrease
+  quantityChange Int // Positive for increase, negative for decrease
   quantityBefore Int
   quantityAfter  Int
-  reason         String?           // e.g., "Sale #S123", "PO #P456 Received", "Stock Adjustment - Damaged Goods"
-  referenceId    String?           // ID of related Sale, PurchaseOrder, etc.
-  userId         String?           // User who performed or initiated the movement
+  reason         String? // e.g., "Sale #S123", "PO #P456 Received", "Stock Adjustment - Damaged Goods"
+  referenceId    String? // ID of related Sale, PurchaseOrder, etc.
+  userId         String? // User who performed or initiated the movement
   user           User?             @relation(fields: [userId], references: [id])
-  createdAt      DateTime          @default(now())
+
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+
+  createdAt DateTime @default(now())
 }
 
 model AppSettings {
-  id                 String    @id @default("main_settings") // Singleton ID
-  appName            String    @default("StockPilot")
-  dateFormat         String    @default("MM/dd/yyyy")
-  timeZone           String    @default("America/New_York")
-  defaultCurrency    String    @default("USD")
-  emailNotifications Boolean   @default(true)
-  lowStockAlerts     Boolean   @default(true)
-  newOrderAlerts     Boolean   @default(false)
-  defaultTaxRate     Decimal   @default(0) // Default sales tax rate as a percentage
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                 String   @id @default("main_settings") // Singleton ID
+  appName            String   @default("StockPilot")
+  dateFormat         String   @default("MM/dd/yyyy")
+  timeZone           String   @default("America/New_York")
+  defaultCurrency    String   @default("USD")
+  emailNotifications Boolean  @default(true)
+  lowStockAlerts     Boolean  @default(true)
+  newOrderAlerts     Boolean  @default(false)
+  defaultTaxRate     Decimal  @default(0) // Default sales tax rate as a percentage
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }

@@ -11,7 +11,8 @@ const DEFAULT_SETTINGS_ID = 'main_settings';
 const mapPrismaSettingsToAppSettings = (prismaSettings: any): AppSettings => {
   return {
     ...prismaSettings,
-    defaultTaxRate: prismaSettings.defaultTaxRate ?? 0, // Ensure defaultTaxRate is a number
+    // Ensure defaultTaxRate is converted from Decimal to number
+    defaultTaxRate: prismaSettings.defaultTaxRate ? prismaSettings.defaultTaxRate.toNumber() : 0,
     createdAt: prismaSettings.createdAt.toISOString(),
     updatedAt: prismaSettings.updatedAt.toISOString(),
   };
@@ -55,6 +56,7 @@ export async function saveAppSettings(data: Partial<Omit<AppSettings, 'id' | 'cr
       where: { id: DEFAULT_SETTINGS_ID },
       data: {
         ...data,
+        // Ensure conversion to number before saving if it's provided
         defaultTaxRate: data.defaultTaxRate !== undefined ? Number(data.defaultTaxRate) : undefined,
       }
     });
@@ -67,3 +69,4 @@ export async function saveAppSettings(data: Partial<Omit<AppSettings, 'id' | 'cr
     throw new Error('Could not save app settings.');
   }
 }
+

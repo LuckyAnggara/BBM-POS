@@ -2,10 +2,9 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import type { Customer, Sale, CartItem, SaleDataForCreation, Product, User } from '@/lib/types'; // Removed StockMovementTypeEnum as it's not directly used here, will use string 'SALE'
-import { StockMovementTypeEnum } from '@/lib/types'; // Explicitly import for use
+import type { Customer, Sale, CartItem, SaleDataForCreation, Product, User, PosSession, CashTransaction, CashTransactionType } from '@/lib/types';
+import { StockMovementTypeEnum, CashTransactionTypeEnum, PosSessionStatusEnum } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-// Removed: import { decreaseProductStockAction } from '@/app/inventory/actions';
 import { getSession } from '@/lib/auth-utils';
 
 const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer | null => {
@@ -58,6 +57,33 @@ const mapPrismaProductToAppProductLocal = (prismaProduct: any): Product => {
   };
 };
 
+const mapPrismaCashTransactionToApp = (dbCashTransaction: any): CashTransaction => {
+    return {
+        ...dbCashTransaction,
+        amount: dbCashTransaction.amount.toNumber(),
+        createdAt: dbCashTransaction.createdAt.toISOString(),
+        user: dbCashTransaction.user ? mapPrismaUserToAppUser(dbCashTransaction.user) : undefined,
+        // sale relation might be complex here, handle as needed or omit from this specific mapper if not always included
+    };
+};
+
+const mapPrismaPosSessionToApp = (dbPosSession: any): PosSession => {
+  return {
+    ...dbPosSession,
+    startTime: dbPosSession.startTime.toISOString(),
+    endTime: dbPosSession.endTime?.toISOString() || null,
+    startingCash: dbPosSession.startingCash.toNumber(),
+    countedCash: dbPosSession.countedCash?.toNumber() || null,
+    expectedCashInDrawer: dbPosSession.expectedCashInDrawer.toNumber(),
+    totalSalesAmount: dbPosSession.totalSalesAmount.toNumber(),
+    totalRefundsAmount: dbPosSession.totalRefundsAmount.toNumber(),
+    createdAt: dbPosSession.createdAt.toISOString(),
+    updatedAt: dbPosSession.updatedAt.toISOString(),
+    user: dbPosSession.user ? mapPrismaUserToAppUser(dbPosSession.user) : undefined,
+    cashTransactions: dbPosSession.cashTransactions?.map(mapPrismaCashTransactionToApp) || [],
+  };
+};
+
 
 const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
     return {
@@ -76,6 +102,7 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
       paymentMethod: dbSale.paymentMethod,
       status: dbSale.status,
       notes: dbSale.notes,
+      cashTransactionId: dbSale.cashTransactionId,
       createdAt: dbSale.createdAt.toISOString(),
       updatedAt: dbSale.updatedAt.toISOString(),
       items: dbSale.items.map((item: any) => ({
@@ -93,6 +120,7 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
       })),
       customer: mapPrismaCustomerToAppCustomer(dbSale.customer),
       user: mapPrismaUserToAppUser(dbSale.user),
+      cashTransaction: dbSale.cashTransaction ? mapPrismaCashTransactionToApp(dbSale.cashTransaction) : undefined,
     };
   };
 
@@ -125,14 +153,11 @@ export async function findOrCreateCustomer(
     }
 
     if (!customer && name) {
-      // Try to find by name if not found by email
       const customersByName = await prisma.customer.findMany({
         where: { name },
       });
-      // If multiple customers have the same name, this might need more specific logic
-      // For now, taking the first one or allowing creation if none perfectly match.
       if (customersByName.length > 0) {
-        customer = customersByName[0]; // Or implement logic to select/confirm
+        customer = customersByName[0]; 
       }
     }
 
@@ -162,7 +187,7 @@ function generateSaleNumber(): string {
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const seconds = String(now.getSeconds()).padStart(2, '0');
-  const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase(); // Shortened for brevity
+  const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `SL-${year}${month}${day}-${hours}${minutes}${seconds}-${randomSuffix}`;
 }
 
@@ -185,7 +210,7 @@ export async function recordSale(
     const productIds = cartItems.map(item => item.productId);
     const productsInDb = await tx.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, costPrice: true, name: true, quantity: true },
+      select: { id: true, costPrice: true, name: true, quantity: true, category: true }, // Added category for revalidation
     });
     const productMap = new Map(productsInDb.map(p => [p.id, p]));
 
@@ -210,6 +235,44 @@ export async function recordSale(
     const grandTotalValue = Math.max(0, subtotal - discountAmount + taxAmountValue + shippingCost);
     const saleNumber = generateSaleNumber();
 
+    let activePosSession: PrismaPosSession | null = null;
+    if (paymentMethod === 'Cash') {
+        activePosSession = await tx.posSession.findFirst({
+            where: { userId: userId, status: PosSessionStatusEnum.OPEN }
+        });
+        if (!activePosSession) {
+            // If strict cash session is required for cash sales, throw error.
+            // Otherwise, proceed without linking to cash session.
+            // For now, let's assume we proceed but log a warning or handle as per business rule.
+            // throw new Error("No active POS session for this cashier. Cash payment cannot be processed.");
+            console.warn(`No active POS session for user ${userId} during cash sale ${saleNumber}. Sale recorded without cash drawer update.`);
+        }
+    }
+
+    let cashTransactionRecordId: string | undefined = undefined;
+    if (paymentMethod === 'Cash' && activePosSession) {
+        const cashTx = await tx.cashTransaction.create({
+            data: {
+                posSessionId: activePosSession.id,
+                userId: userId,
+                type: CashTransactionTypeEnum.SALE_CASH,
+                amount: grandTotalValue, // Cash received for the sale
+                description: `Sale #${saleNumber}`,
+            }
+        });
+        cashTransactionRecordId = cashTx.id;
+
+        // Update PosSession expected cash
+        await tx.posSession.update({
+            where: { id: activePosSession.id },
+            data: {
+                expectedCashInDrawer: { increment: grandTotalValue },
+                totalSalesAmount: { increment: grandTotalValue }
+            }
+        });
+    }
+
+
     const createdSale = await tx.sale.create({
       data: {
         saleNumber,
@@ -220,11 +283,12 @@ export async function recordSale(
         taxAmount: taxAmountValue,
         shippingCost,
         grandTotal: grandTotalValue,
-        customerName: customerName,
+        customerName: customerName || 'Guest Customer', // Ensure customerName is always set
         paymentMethod,
         status,
         ...(customerId && { customerId: customerId }),
         userId,
+        cashTransactionId: cashTransactionRecordId, // Link to cash transaction if applicable
         items: {
           create: saleItemsData,
         },
@@ -232,23 +296,20 @@ export async function recordSale(
       include: {
           items: { include: { product: {include: {category: true} } } },
           customer: true,
-          user: true
+          user: true,
+          cashTransaction: true, // Include the cash transaction
         },
     });
 
-    // Decrease stock and log movement directly within this transaction
     for (const item of createdSale.items) {
-      const product = productMap.get(item.productId); // Use already fetched product info
+      const product = productMap.get(item.productId); 
       if (!product) {
-        // This should not happen if stock check passed, but as a safeguard
         throw new Error(`Product with ID ${item.productId} not found during stock update for sale ${createdSale.saleNumber}.`);
       }
 
       const quantityBefore = product.quantity;
       const quantityAfter = quantityBefore - item.quantity;
 
-      // The initial stock check should prevent quantityAfter < 0
-      // If it still happens, it indicates a race condition or a flaw in initial check
       if (quantityAfter < 0) {
         throw new Error(`Stock for ${item.productName} would go below zero. Transaction rolled back.`);
       }
@@ -261,28 +322,28 @@ export async function recordSale(
       await tx.stockMovement.create({
         data: {
           productId: item.productId,
-          type: StockMovementTypeEnum.SALE, // Use enum
+          type: StockMovementTypeEnum.SALE,
           quantityChange: -item.quantity,
           quantityBefore,
           quantityAfter,
           reason: `Sale #${createdSale.saleNumber}`,
           referenceId: createdSale.id,
-          userId, // userId from session
+          userId,
         },
       });
     }
 
     revalidatePath('/pos');
     revalidatePath('/sales/history');
-    revalidatePath('/inventory'); // General inventory revalidation
-    createdSale.items.forEach(item => { // More specific revalidations
-        revalidatePath(`/inventory/${item.productId}`);
-        revalidatePath(`/inventory/${item.productId}/history`);
+    revalidatePath('/inventory'); 
+    createdSale.items.forEach(item => { 
+        if (item.product?.id) revalidatePath(`/inventory/${item.product.id}`);
+        if (item.product?.id) revalidatePath(`/inventory/${item.product.id}/history`);
         if (item.product?.category?.name) {
             revalidatePath(`/inventory?category=${encodeURIComponent(item.product.category.name)}`);
         }
     });
-    revalidatePath('/admin/products'); // For admin product list view
+    revalidatePath('/admin/products');
 
     return mapPrismaSaleToAppSale(createdSale);
   }).catch(error => {
@@ -294,8 +355,89 @@ export async function recordSale(
          console.error('Sale number collision, this should be very rare.');
          throw new Error('Failed to generate a unique sale number. Please try again.');
     }
+    // Catch other specific errors related to PosSession or CashTransaction if needed
     throw new Error('Could not record sale.');
   });
 }
 
+
+// POS Session Actions
+export async function startPosSession(startingCash: number): Promise<PosSession> {
+  const session = await getSession();
+  if (!session?.user?.id) {
+    throw new Error("User not authenticated to start a POS session.");
+  }
+  const userId = session.user.id;
+
+  // Check if user already has an open session
+  const existingOpenSession = await prisma.posSession.findFirst({
+    where: {
+      userId: userId,
+      status: PosSessionStatusEnum.OPEN,
+    },
+  });
+
+  if (existingOpenSession) {
+    throw new Error("You already have an active POS session. Please close it before starting a new one.");
+  }
+  
+  if (startingCash < 0) {
+    throw new Error("Starting cash cannot be negative.");
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    const newPosSession = await tx.posSession.create({
+      data: {
+        userId: userId,
+        startTime: new Date(),
+        startingCash: startingCash,
+        expectedCashInDrawer: startingCash, // Initially, expected is same as starting
+        status: PosSessionStatusEnum.OPEN,
+        totalSalesAmount: 0,
+        totalRefundsAmount: 0,
+      },
+      include: { user: true, cashTransactions: true } 
+    });
+
+    // Create the initial cash transaction for starting cash
+    await tx.cashTransaction.create({
+      data: {
+        posSessionId: newPosSession.id,
+        userId: userId,
+        type: CashTransactionTypeEnum.STARTING_CASH,
+        amount: startingCash,
+        description: "Initial cash for session",
+      },
+    });
+
+    revalidatePath('/pos');
+    return mapPrismaPosSessionToApp(newPosSession);
+  });
+}
+
+
+export async function getActivePosSession(): Promise<PosSession | null> {
+  const session = await getSession();
+  if (!session?.user?.id) {
+    console.warn("No authenticated user to fetch active POS session.");
+    return null;
+  }
+  const userId = session.user.id;
+
+  const activeDbSession = await prisma.posSession.findFirst({
+    where: {
+      userId: userId,
+      status: PosSessionStatusEnum.OPEN,
+    },
+    include: { user: true, cashTransactions: { orderBy: { createdAt: 'asc' } } }
+  });
+
+  if (!activeDbSession) {
+    return null;
+  }
+  return mapPrismaPosSessionToApp(activeDbSession);
+}
+
+// TODO: Implement endPosSession action
+// export async function endPosSession(sessionId: string, countedCash: number): Promise<PosSession> { ... }
     

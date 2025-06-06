@@ -2,7 +2,8 @@
 'use client';
 import { useCartStore } from '@/store/cart-store';
 import { useInventoryStore } from '@/store/inventory-store';
-import type { CartItem, SaleDataForCreation, Customer } from '@/lib/types'; // Removed StockMovementTypeEnum as it's not directly used here
+import { usePosSessionStore } from '@/store/pos-session-store'; // Import POS session store
+import type { CartItem, SaleDataForCreation, Customer } from '@/lib/types'; 
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
@@ -18,7 +19,6 @@ import { fetchAppSettings } from '@/app/admin/settings/actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
 
-// MOCK_USER_ID is no longer needed here as server action will get user from session.
 
 export function CartDisplay() {
   const {
@@ -29,7 +29,8 @@ export function CartDisplay() {
     shippingCost, setShippingCost,
     paymentMethod, setPaymentMethod
   } = useCartStore();
-  const { getProductById } = useInventoryStore(); // decreaseStock is now handled by recordSale server action
+  const { getProductById } = useInventoryStore(); 
+  const { activeSession, isLoading: isLoadingSession } = usePosSessionStore(); // Get active POS session state
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [promoCode, setPromoCode] = useState('');
@@ -64,6 +65,16 @@ export function CartDisplay() {
       toast.error("Your cart is empty. Please add items to proceed.");
       return;
     }
+    if (!activeSession && paymentMethod === "Cash") {
+        toast.error("No active POS session. Please start a shift to process cash sales.");
+        setIsCheckingOut(false);
+        return;
+    }
+    if (!activeSession && paymentMethod !== "Cash") {
+        toast.warn("No active POS session. Sale will be recorded without cash drawer tracking.");
+    }
+
+
     setIsCheckingOut(true);
 
     for (const item of items) {
@@ -88,7 +99,6 @@ export function CartDisplay() {
       }
     }
     const currentSubtotalVal = subtotal();
-    // Remove userId from payload, server action gets it from session
     const saleDataPayload: Omit<SaleDataForCreation, 'userId'> = {
       cartItems: items,
       subtotal: currentSubtotalVal,
@@ -101,6 +111,11 @@ export function CartDisplay() {
     };
     try {
       const recordedSale = await recordSale(saleDataPayload);
+      
+      // Refetch active session to update expected cash if it was a cash sale
+      if (paymentMethod === 'Cash') {
+        usePosSessionStore.getState().fetchActiveSession();
+      }
 
       toast.success("Sale " + recordedSale.saleNumber + " successful!", {
           description: (customerName ? "Customer: " + customerName + ". " : '') + "Total: $" + recordedSale.grandTotal.toFixed(2) + " for " + totalItems() + " items."
@@ -124,6 +139,9 @@ export function CartDisplay() {
   const taxableAmount = Math.max(0, currentSubtotal - discountAmount);
   const currentTaxAmount = taxableAmount * (taxPercent / 100);
   const currentGrandTotal = grandTotal();
+  
+  const canCheckout = activeSession || paymentMethod !== 'Cash';
+
 
   return (
     <Card className="flex flex-col h-full shadow-lg">
@@ -309,10 +327,16 @@ export function CartDisplay() {
             </SelectContent>
           </Select>
 
-          <Button size="lg" className="w-full mt-1 h-10 text-sm" onClick={handleCheckout} disabled={isCheckingOut || isLoadingSettings}>
-            {isCheckingOut || isLoadingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          <Button 
+            size="lg" 
+            className="w-full mt-1 h-10 text-sm" 
+            onClick={handleCheckout} 
+            disabled={isCheckingOut || isLoadingSettings || isLoadingSession || !canCheckout}
+            title={!canCheckout && paymentMethod === "Cash" ? "Please start a POS session to process cash sales." : ""}
+          >
+            {(isCheckingOut || isLoadingSettings || isLoadingSession) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Pay
-            {isCheckingOut || isLoadingSettings ? "" : <span className="ml-1">➔</span>}
+            {!(isCheckingOut || isLoadingSettings || isLoadingSession) && <span className="ml-1">➔</span>}
           </Button>
         </CardFooter>
       )}

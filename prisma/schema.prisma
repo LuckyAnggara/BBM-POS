@@ -1,7 +1,7 @@
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:./dev.db"
 }
 
 generator client {
@@ -9,23 +9,24 @@ generator client {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String // Hash this in a real app!
-  role      String   // e.g., ADMIN, MANAGER, STAFF
-  avatarUrl String?
-  isActive  Boolean  @default(true)
-  lastLogin DateTime?
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String // Stores hashed password
+  role          String    // e.g., ADMIN, MANAGER, STAFF (matches UserRole type)
+  avatarUrl     String?
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  purchaseOrders    PurchaseOrder[] @relation("CreatedPurchaseOrders")
+  sales             Sale[]
+  stockMovements    StockMovement[]
+  posSessions       PosSession[] // User can have multiple POS sessions
+  cashTransactions  CashTransaction[] // User can perform multiple cash transactions
 
-  purchaseOrders  PurchaseOrder[] @relation("CreatedBy")
-  sales           Sale[]
-  stockMovements  StockMovement[]
-
-  @@index([email])
+  @@map("users")
 }
 
 model Category {
@@ -34,20 +35,22 @@ model Category {
   products  Product[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  @@map("categories")
 }
 
 model Product {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   name              String
-  sku               String   @unique
-  quantity          Int      @default(0)
+  sku               String    @unique
+  quantity          Int
   price             Decimal
   costPrice         Decimal?
   supplier          String?
   description       String?
   imageUrl          String?
-  tags              String? // JSON string for tags: ["tag1", "tag2"]
-  lowStockThreshold Int?     @default(10)
+  tags              String?   // JSON string for array of tags
+  lowStockThreshold Int?      @default(10)
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
@@ -59,174 +62,234 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([name])
-  @@index([sku])
+  @@map("products")
 }
 
 model PurchaseOrder {
-  id        String   @id @default(cuid())
-  poNumber  String   @unique
-  supplierName String
-  orderDate DateTime
+  id            String    @id @default(cuid())
+  poNumber      String    @unique
+  supplierName  String
+  orderDate     DateTime
   expectedDeliveryDate DateTime?
-  status    String   // e.g., Draft, Ordered, Received, Cancelled
-  items     PurchaseOrderItem[]
+  status        String    // e.g., Draft, Ordered, Received, Cancelled
+  
+  items         PurchaseOrderItem[]
 
-  discountAmount Decimal? @default(0)
-  shippingCost   Decimal? @default(0)
-  taxes          Decimal? @default(0)
-  totalAmount    Decimal  // Calculated: subtotal - discount + shipping + taxes
+  discountAmount Decimal?
+  shippingCost  Decimal?
+  taxes         Decimal?
+  totalAmount   Decimal   // Calculated: subtotal - discount + shipping + taxes
 
-  notes     String?
+  notes         String?
 
   createdById String
-  createdBy   User     @relation("CreatedBy", fields: [createdById], references: [id])
+  createdBy   User     @relation("CreatedPurchaseOrders", fields: [createdById], references: [id])
 
-  stockMovements StockMovement[] // If PO receipt directly creates movements
+  stockMovements StockMovement[] // For received items
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([poNumber])
-  @@index([status])
+  @@map("purchase_orders")
 }
 
 model PurchaseOrderItem {
-  id        String   @id @default(cuid())
+  id            String   @id @default(cuid())
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   purchaseOrderId String
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-
-  productId String
-  product   Product  @relation(fields: [productId], references: [id])
-  productName String // Denormalized for easy display on PO
+  
+  product       Product @relation(fields: [productId], references: [id])
+  productId     String
+  productName   String   // Denormalized for easier display on PO
   quantityOrdered Int
   quantityReceived Int?
-  unitCost  Decimal
-  totalCost Decimal // Calculated: quantityOrdered * unitCost
+  unitCost      Decimal
+  totalCost     Decimal  // Calculated: quantityOrdered * unitCost
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([purchaseOrderId])
-  @@index([productId])
+  @@map("purchase_order_items")
 }
 
 model Customer {
-  id    String @id @default(cuid())
-  name  String
-  email String? @unique
-  phone String?
-  // address String? // Consider a separate Address model if complex
-
-  sales Sale[]
-
+  id        String   @id @default(cuid())
+  name      String
+  email     String?  @unique
+  phone     String?
+  address   String?
+  sales     Sale[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([email])
-  @@index([name])
+  @@map("customers")
 }
 
 model Sale {
-  id           String @id @default(cuid())
-  saleNumber   String @unique
-  saleDate     DateTime @default(now())
+  id             String   @id @default(cuid())
+  saleNumber     String   @unique
+  saleDate       DateTime @default(now())
+  
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id])
+  customerName   String // Denormalized customer name, or "Guest"
 
-  customerId   String?
-  customer     Customer? @relation(fields: [customerId], references: [id])
-  customerName String // Denormalized, especially if customer is guest or details change
+  userId         String
+  user           User     @relation(fields: [userId], references: [id]) // Cashier/Seller
 
-  userId       String // ID of the staff/user who made the sale
-  user         User     @relation(fields: [userId], references: [id])
-
-  items        SaleItem[]
+  items          SaleItem[]
 
   subtotal       Decimal
   discountAmount Decimal  @default(0)
-  taxPercent     Decimal  @default(0) // Store as percentage, e.g., 7.5 for 7.5%
-  taxAmount      Decimal  // Calculated: (subtotal - discountAmount) * taxPercent / 100
+  taxPercent     Decimal  @default(0) // Tax percentage applied
+  taxAmount      Decimal  @default(0) // Calculated tax amount
   shippingCost   Decimal  @default(0)
-  grandTotal     Decimal  // Calculated: subtotal - discountAmount + taxAmount + shippingCost
+  grandTotal     Decimal  // Calculated: subtotal - discount + taxAmount + shipping
 
-  paymentMethod String? // e.g., Cash, Credit Card, VISA
-  status        String   // e.g., PendingPayment, Completed, Refunded, Cancelled
-  notes         String?
+  paymentMethod  String   // e.g., Cash, Credit Card, etc.
+  status         String   // e.g., PendingPayment, Completed, Refunded, Cancelled
 
-  stockMovements StockMovement[] // If sale directly creates movements
+  notes          String?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  stockMovements StockMovement[] // For sold items or returned items
 
-  @@index([saleNumber])
-  @@index([status])
-  @@index([customerId])
-  @@index([userId])
+  cashTransactionId String? @unique // Link to a cash transaction if paid by cash during a POS session
+  cashTransaction   CashTransaction? @relation(fields: [cashTransactionId], references: [id])
+
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("sales")
 }
 
 model SaleItem {
-  id        String @id @default(cuid())
-  saleId    String
-  sale      Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
-
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-  productName String // Denormalized
-  quantity  Int
-  unitPrice Decimal
-  totalPrice Decimal // Calculated: quantity * unitPrice
+  id            String   @id @default(cuid())
+  sale          Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId        String
+  
+  product       Product  @relation(fields: [productId], references: [id])
+  productId     String
+  productName   String   // Denormalized for easier display on invoice
+  quantity      Int
+  unitPrice     Decimal  // Price at the time of sale
+  totalPrice    Decimal  // Calculated: quantity * unitPrice
   costPriceAtSale Decimal? // Cost price of the product at the time of sale for profit calculation
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  @@index([saleId])
-  @@index([productId])
-}
-
-
-model AppSettings {
-  id                 String    @id @default("main_settings")
-  appName            String    @default("StockPilot")
-  dateFormat         String    @default("MM/dd/yyyy")
-  timeZone           String    @default("America/New_York")
-  defaultCurrency    String    @default("USD")
-  emailNotifications Boolean   @default(true)
-  lowStockAlerts     Boolean   @default(true)
-  newOrderAlerts     Boolean   @default(false)
-  defaultTaxRate     Decimal   @default(0) // e.g., 7.5 for 7.5%
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  @@map("sale_items")
 }
 
 enum StockMovementType {
   INITIAL_STOCK
   SALE
   PURCHASE_RECEIPT
-  RETURN_CUSTOMER // Added for customer returns
-  RETURN_SUPPLIER // For returning goods to supplier
-  ADJUSTMENT_IN   // Manual stock increase
-  ADJUSTMENT_OUT  // Manual stock decrease (shrinkage, damage)
-  TRANSFER_IN     // Stock transfer between locations (if multi-location)
-  TRANSFER_OUT    // Stock transfer between locations (if multi-location)
+  RETURN_CUSTOMER // Added for customer returns/refunds
+  RETURN_SUPPLIER
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  TRANSFER_IN
+  TRANSFER_OUT
 }
 
 model StockMovement {
-  id             String   @id @default(cuid())
-  productId      String
-  product        Product  @relation(fields: [productId], references: [id])
-  type           StockMovementType
+  id            String   @id @default(cuid())
+  product       Product  @relation(fields: [productId], references: [id])
+  productId     String
+  type          StockMovementType
   quantityChange Int      // Positive for increase, negative for decrease
-  quantityBefore Int      // Stock quantity before this movement
-  quantityAfter  Int      // Stock quantity after this movement
-  reason         String?  // e.g., "Sale #S1001", "PO #PO005 Received", "Stock Adjustment - Damaged"
-  referenceId    String?  // ID of related Sale, PO, Adjustment record, etc.
-  
-  userId         String?  // ID of the user who initiated/caused the movement (optional)
-  user           User?    @relation(fields: [userId], references: [id])
+  quantityBefore Int
+  quantityAfter  Int
+  reason        String?  // e.g., "Sale #S123", "PO #P001 Received", "Stock Adjustment"
+  referenceId   String?  // Optional: ID of related Sale, PO, or Adjustment document
+  userId        String?  // User who initiated or is responsible for the movement
+  user          User?    @relation(fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
 
-  createdAt      DateTime @default(now())
+  // If referenceId points to a Sale or PurchaseOrder
+  sale          Sale?    @relation(fields: [referenceId], references: [id], name: "SaleStockMovement")
+  purchaseOrder PurchaseOrder? @relation(fields: [referenceId], references: [id], name: "PurchaseOrderStockMovement")
 
-  @@index([productId])
-  @@index([type])
-  @@index([referenceId])
+  @@map("stock_movements")
 }
+
+model AppSettings {
+  id            String    @id @default("main_settings") // Singleton settings record
+  appName       String    @default("StockPilot")
+  dateFormat    String    @default("MM/dd/yyyy")
+  timeZone      String    @default("America/New_York")
+  defaultCurrency String  @default("USD")
+  emailNotifications Boolean @default(true)
+  lowStockAlerts Boolean   @default(true)
+  newOrderAlerts Boolean   @default(false) // For things like new Purchase Orders for admin
+  defaultTaxRate Decimal  @default(0) // Default sales tax rate as a percentage
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("app_settings")
+}
+
+
+// New Models for POS Cash Management
+enum PosSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum CashTransactionType {
+  STARTING_CASH
+  SALE_CASH
+  REFUND_CASH // For cash refunds
+  PAY_IN        // Cash added to drawer (not from sale)
+  PAY_OUT       // Cash removed from drawer (not for refund)
+}
+
+model PosSession {
+  id                  String    @id @default(cuid())
+  userId              String    // The user (cashier) who started this session
+  user                User      @relation(fields: [userId], references: [id])
+  
+  startTime           DateTime  @default(now())
+  endTime             DateTime?
+  
+  startingCash        Decimal   // Initial cash in drawer
+  countedCash         Decimal?  // Actual cash counted at the end of session
+  expectedCashInDrawer Decimal  // Calculated: startingCash + cashSales - cashRefunds + payIns - payOuts
+  
+  totalSalesAmount    Decimal   @default(0) // Sum of grandTotal for cash sales in this session
+  totalRefundsAmount  Decimal   @default(0) // Sum of grandTotal for cash refunds in this session
+  
+  status              PosSessionStatus @default(OPEN)
+  notes               String?
+
+  cashTransactions    CashTransaction[]
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@map("pos_sessions")
+}
+
+model CashTransaction {
+  id                String     @id @default(cuid())
+  posSessionId      String
+  posSession        PosSession @relation(fields: [posSessionId], references: [id])
+  
+  userId            String     // User who performed the transaction
+  user              User       @relation(fields: [userId], references: [id])
+
+  type              CashTransactionType
+  amount            Decimal    // Positive for cash in (sale, pay_in), negative for cash out (refund, pay_out)
+  description       String?    // e.g., "Sale #S123", "Refund for Sale #S124", "Cash Deposit"
+  
+  saleId            String?    @unique // If this transaction is related to a specific sale
+  sale              Sale?      // Relation defined in Sale model using cashTransactionId
+
+  createdAt         DateTime   @default(now())
+
+  @@map("cash_transactions")
+}
+

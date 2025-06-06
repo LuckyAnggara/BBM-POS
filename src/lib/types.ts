@@ -1,10 +1,27 @@
 
-import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, AppSettings as PrismaAppSettings, Customer as PrismaCustomer, Sale as PrismaSale, SaleItem as PrismaSaleItem, Category as PrismaCategory, StockMovement as PrismaStockMovement } from '@prisma/client';
-import { StockMovementType as PrismaClientStockMovementType } from '@prisma/client'; // Import enum as value (and type)
+import type { 
+  User as PrismaUser, 
+  Product as PrismaProduct, 
+  PurchaseOrder as PrismaPurchaseOrder, 
+  PurchaseOrderItem as PrismaPurchaseOrderItem, 
+  AppSettings as PrismaAppSettings, 
+  Customer as PrismaCustomer, 
+  Sale as PrismaSale, 
+  SaleItem as PrismaSaleItem, 
+  Category as PrismaCategory, 
+  StockMovement as PrismaStockMovement,
+  PosSession as PrismaPosSession,
+  CashTransaction as PrismaCashTransaction
+} from '@prisma/client';
+import { 
+  StockMovementType as PrismaClientStockMovementType,
+  CashTransactionType as PrismaClientCashTransactionType,
+  PosSessionStatus as PrismaClientPosSessionStatus
+} from '@prisma/client';
 
 export interface Category extends Omit<PrismaCategory, 'createdAt' | 'updatedAt'> {
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  createdAt: string; 
+  updatedAt: string; 
 }
 
 export interface Product {
@@ -33,7 +50,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   imageUrl?: string | null;
-  costPrice?: number | null; // Added to cart item to carry over to SaleItem
+  costPrice?: number | null;
 }
 
 export type PurchaseOrderStatus = string;
@@ -76,6 +93,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  // password field should not be in client-side User type for security
   role: UserRole; 
   avatarUrl?: string | null;
   isActive: boolean;
@@ -102,7 +120,6 @@ export interface AppSettings extends Omit<PrismaAppSettings, 'createdAt' | 'upda
   updatedAt: string; 
 }
 
-// POS and Sales Related Types
 export interface Customer extends Omit<PrismaCustomer, 'createdAt' | 'updatedAt'> {
   createdAt: string;
   updatedAt: string;
@@ -110,44 +127,73 @@ export interface Customer extends Omit<PrismaCustomer, 'createdAt' | 'updatedAt'
 
 export interface SaleItem extends Omit<PrismaSaleItem, 'createdAt' | 'updatedAt' | 'sale' | 'product' | 'costPriceAtSale'> {
   product?: Product; 
-  costPriceAtSale?: number | null; // Ensure this is number
+  costPriceAtSale?: number | null; 
   createdAt: string;
   updatedAt: string;
 }
 
-export type SaleStatus = 'PendingPayment' | 'Completed' | 'Refunded' | 'Cancelled' | string; // Added Refunded
+export type SaleStatus = 'PendingPayment' | 'Completed' | 'Refunded' | 'Cancelled' | string;
 
-export interface Sale extends Omit<PrismaSale, 'createdAt' | 'updatedAt' | 'saleDate' | 'customer' | 'user' | 'items' | 'status'> {
-  saleDate: string; // ISO date string
+export interface Sale extends Omit<PrismaSale, 'createdAt' | 'updatedAt' | 'saleDate' | 'customer' | 'user' | 'items' | 'status' | 'cashTransaction' | 'cashTransactionId'> {
+  saleDate: string; 
   customer?: Customer | null;
-  user?: User; // Cashier/Seller
+  user?: User; 
   items: SaleItem[];
   status: SaleStatus; 
   paymentMethod?: string | null;
+  cashTransactionId?: string | null;
+  cashTransaction?: CashTransaction | null; // Optional for full data load
   createdAt: string;
   updatedAt: string;
 }
 
-// For creating a sale
 export type SaleItemDataForCreation = Omit<SaleItem, 'id' | 'createdAt' | 'updatedAt' | 'saleId'>;
 
-export type SaleDataForCreation = Omit<Sale, 'id' | 'saleNumber' | 'createdAt' | 'updatedAt' | 'items' | 'user' | 'customer' | 'saleDate' | 'status'> & {
+export type SaleDataForCreation = Omit<Sale, 'id' | 'saleNumber' | 'createdAt' | 'updatedAt' | 'items' | 'user' | 'customer' | 'saleDate' | 'status' | 'cashTransaction'> & {
   customerId?: string; 
-  // userId: string; // Removed, will be taken from session
   cartItems: CartItem[]; 
   paymentMethod: string; 
   status?: SaleStatus; 
 };
 
-// Stock Movement Types
-// Use the imported PrismaClientStockMovementType for both the type and the enum value
 export type StockMovementType = PrismaClientStockMovementType;
 export const StockMovementTypeEnum = PrismaClientStockMovementType;
 
-
 export interface StockMovement extends Omit<PrismaStockMovement, 'createdAt' | 'product' | 'user' | 'type'> {
   type: StockMovementType;
-  product?: Product; // Optional for display
-  user?: User;       // Optional for display
-  createdAt: string; // ISO date string
+  product?: Product; 
+  user?: User;       
+  createdAt: string; 
 }
+
+// POS Cash Management Types
+export type PosSessionStatus = PrismaClientPosSessionStatus;
+export const PosSessionStatusEnum = PrismaClientPosSessionStatus;
+
+export type CashTransactionType = PrismaClientCashTransactionType;
+export const CashTransactionTypeEnum = PrismaClientCashTransactionType;
+
+export interface PosSession extends Omit<PrismaPosSession, 'startTime' | 'endTime' | 'createdAt' | 'updatedAt' | 'user' | 'cashTransactions' | 'startingCash' | 'countedCash' | 'expectedCashInDrawer' | 'totalSalesAmount' | 'totalRefundsAmount' | 'status'> {
+  startTime: string;
+  endTime?: string | null;
+  status: PosSessionStatus;
+  startingCash: number;
+  countedCash?: number | null;
+  expectedCashInDrawer: number;
+  totalSalesAmount: number;
+  totalRefundsAmount: number;
+  user?: User; // User who owns the session
+  cashTransactions?: CashTransaction[]; // Transactions within this session
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CashTransaction extends Omit<PrismaCashTransaction, 'createdAt' | 'posSession' | 'user' | 'amount' | 'type' | 'sale'> {
+  type: CashTransactionType;
+  amount: number;
+  user?: User; // User who performed the transaction
+  posSession?: PosSession; // The session this transaction belongs to
+  sale?: Sale; // If this transaction is linked to a sale
+  createdAt: string;
+}
+

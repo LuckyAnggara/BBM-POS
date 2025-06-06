@@ -2,12 +2,13 @@
 import type { ReactNode } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
-import { Users, Package, Settings, ChevronRight, ListTree } from 'lucide-react'; // Added ListTree
+import { Users, Package, Settings, ChevronRight, ListTree, WalletCards } from 'lucide-react'; // Added WalletCards
 
 const adminNavItems = [
   { href: '/admin/users', label: 'User Management', icon: Users },
   { href: '/admin/products', label: 'Product Catalog', icon: Package },
-  { href: '/admin/categories', label: 'Manage Categories', icon: ListTree }, // Added Categories link
+  { href: '/admin/categories', label: 'Product Categories', icon: ListTree },
+  { href: '/admin/expenses/categories', label: 'Expense Categories', icon: WalletCards }, // Added Expense Categories link
   { href: '/admin/settings', label: 'System Settings', icon: Settings },
 ];
 
@@ -20,7 +21,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <p className="text-muted-foreground">Manage system settings, users, products, and categories.</p>
         </div>
       </div>
-      
+
       <div className="grid md:grid-cols-[280px_1fr] gap-6 items-start">
         <Card className="sticky top-[calc(var(--header-height,56px)+theme(spacing.6))]">
           <CardContent className="p-4">
@@ -49,3 +50,5 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+    

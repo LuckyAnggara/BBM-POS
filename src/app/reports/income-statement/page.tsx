@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Loader2, FileText, TrendingUp, TrendingDown, DollarSign, FileSpreadsheet } from 'lucide-react';
+import { CalendarIcon, Loader2, FileText, TrendingUp, TrendingDown, DollarSign, FileSpreadsheet, ReceiptText, Printer } from 'lucide-react'; // Added Printer
 import { format, subDays } from 'date-fns';
 import { fetchIncomeStatementData } from '../actions';
 import type { IncomeStatementData } from '@/lib/types';
@@ -21,14 +21,16 @@ interface StatDisplayProps {
   isLoading: boolean;
   currency?: boolean;
   trend?: 'positive' | 'negative' | 'neutral';
+  isExpense?: boolean;
 }
 
-function StatDisplay({ title, value, icon: Icon, isLoading, currency = true, trend = 'neutral' }: StatDisplayProps) {
-  const formattedValue = currency 
-    ? value?.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) 
+function StatDisplay({ title, value, icon: Icon, isLoading, currency = true, trend = 'neutral', isExpense = false }: StatDisplayProps) {
+  const formattedValue = currency
+    ? value?.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
     : value?.toLocaleString();
 
-  const trendColor = trend === 'positive' ? 'text-green-600' : trend === 'negative' ? 'text-red-600' : 'text-muted-foreground';
+  let trendColor = trend === 'positive' ? 'text-green-600' : trend === 'negative' ? 'text-red-600' : 'text-muted-foreground';
+  if (isExpense && value !== null && value > 0) trendColor = 'text-red-600'; // Expenses are typically negative impact
 
   return (
     <Card>
@@ -76,7 +78,7 @@ export default function IncomeStatementPage() {
       setIsLoading(false);
     }
   };
-  
+
   const handlePrintReport = () => {
     window.print();
   };
@@ -91,7 +93,7 @@ export default function IncomeStatementPage() {
           </CardTitle>
           <CardDescription>
             Select a date range to generate the income statement.
-            This report reflects completed sales only.
+            This report reflects completed sales and recorded expenses.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -145,18 +147,19 @@ export default function IncomeStatementPage() {
       </Card>
 
       {reportData && !isLoading && (
-        <Card className="print:shadow-none print:border-none">
+        <Card className="print:shadow-none print:border-none report-print-area" id="income-statement-content">
           <CardHeader>
-            <CardTitle className="text-xl font-headline">Report for Period:</CardTitle>
+            <CardTitle className="text-xl font-headline">Income Statement</CardTitle>
             <CardDescription>
-              {format(new Date(reportData.startDate), 'PPP')} - {format(new Date(reportData.endDate), 'PPP')}
+              For the period: {format(new Date(reportData.startDate), 'PPP')} - {format(new Date(reportData.endDate), 'PPP')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <StatDisplay title="Total Revenue" value={reportData.revenue} icon={TrendingUp} isLoading={isLoading} trend="positive" />
-              <StatDisplay title="Cost of Goods Sold (COGS)" value={reportData.cogs} icon={TrendingDown} isLoading={isLoading} trend="negative"/>
-              <StatDisplay title="Gross Profit" value={reportData.grossProfit} icon={DollarSign} isLoading={isLoading} trend={reportData.grossProfit >= 0 ? 'positive' : 'negative'}/>
+              <StatDisplay title="Cost of Goods Sold (COGS)" value={reportData.cogs} icon={TrendingDown} isLoading={isLoading} trend="negative" isExpense/>
+              <StatDisplay title="Operating Expenses" value={reportData.operatingExpenses} icon={ReceiptText} isLoading={isLoading} trend="negative" isExpense/>
+              <StatDisplay title="Net Income" value={reportData.netIncome} icon={DollarSign} isLoading={isLoading} trend={reportData.netIncome >= 0 ? 'positive' : 'negative'}/>
             </div>
             <div className="border-t pt-4 mt-4">
                 <h3 className="text-lg font-semibold">Summary</h3>
@@ -166,17 +169,16 @@ export default function IncomeStatementPage() {
                         <span className="font-medium">{reportData.revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
                     </div>
                     <div className="flex justify-between">
-                        <span>Cost of Goods Sold:</span>
+                        <span>Cost of Goods Sold (COGS):</span>
                         <span className="font-medium">({reportData.cogs.toLocaleString('en-US', { style: 'currency', currency: 'USD' })})</span>
                     </div>
                     <div className="flex justify-between font-semibold border-t pt-1 mt-1">
                         <span>Gross Profit:</span>
                         <span>{reportData.grossProfit.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
                     </div>
-                    {/* Future: Operating Expenses can be added here */}
-                     <div className="flex justify-between text-muted-foreground">
+                     <div className="flex justify-between">
                         <span>Operating Expenses:</span>
-                        <span className="font-medium">($0.00)</span>
+                        <span className="font-medium">({reportData.operatingExpenses.toLocaleString('en-US', { style: 'currency', currency: 'USD' })})</span>
                     </div>
                     <div className="flex justify-between font-bold text-base border-t-2 pt-2 mt-2">
                         <span>Net Income:</span>
@@ -185,7 +187,7 @@ export default function IncomeStatementPage() {
                 </div>
             </div>
              <p className="text-xs text-muted-foreground pt-4 print:hidden">
-              Note: This statement is based on completed sales and recorded cost of goods sold. It does not include other operating expenses.
+              Note: This statement is based on completed sales, recorded cost of goods sold, and logged operating expenses.
             </p>
           </CardContent>
         </Card>
@@ -197,10 +199,12 @@ export default function IncomeStatementPage() {
             <Skeleton className="h-16 w-full" />
             <Skeleton className="h-16 w-full" />
             <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
           </CardContent>
          </Card>
       )}
-
     </div>
   );
 }
+
+    

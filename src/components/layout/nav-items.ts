@@ -12,10 +12,12 @@ import {
   ListTree,
   BarChart3,
   SlidersHorizontal,
-  DollarSign, 
+  DollarSign,
   TrendingUp,
   History as HistoryIcon,
-  FileText, // Added for Reports
+  FileText,
+  ReceiptText, // For Expenses
+  WalletCards, // For Expense Categories
 } from 'lucide-react';
 
 export interface NavSubItem {
@@ -44,34 +46,34 @@ export const sidebarNavGroups: NavGroup[] = [
     groupTitle: 'Platform',
     items: [
       {
-        label: 'Dashboard', 
-        icon: LayoutDashboard, 
+        label: 'Dashboard',
+        icon: LayoutDashboard,
         href: '/',
         isActive: (pathname) => pathname === '/',
       },
       {
-        label: 'Inventory', 
-        icon: Warehouse, 
-        isInitiallyOpen: false, 
+        label: 'Inventory',
+        icon: Warehouse,
+        isInitiallyOpen: false,
         subItems: [
           {
             href: '/inventory',
             label: 'All Products',
-            icon: Package, 
+            icon: Package,
             isActive: (pathname) => pathname === '/inventory' || pathname.startsWith('/inventory/') && !pathname.endsWith('/add') && !pathname.endsWith('/history'),
           },
           {
             href: '/inventory/add',
             label: 'Add New Product',
-            icon: Package, 
+            icon: Package,
             isActive: (pathname) => pathname === '/inventory/add',
           },
         ],
         isActive: (pathname) => pathname.startsWith('/inventory'),
       },
       {
-        label: 'Sales', 
-        icon: DollarSign, 
+        label: 'Sales',
+        icon: DollarSign,
         isInitiallyOpen: false,
         subItems: [
           { href: '/sales/history', label: 'Sales History', icon: HistoryIcon },
@@ -79,19 +81,28 @@ export const sidebarNavGroups: NavGroup[] = [
         isActive: (pathname) => pathname.startsWith('/sales'),
       },
       {
+        label: 'Expenses', // New Expenses Module
+        icon: ReceiptText,
+        isInitiallyOpen: false,
+        subItems: [
+          { href: '/expenses', label: 'Expense Log', icon: HistoryIcon },
+          { href: '/expenses/add', label: 'Add New Expense', icon: PlusCircle },
+        ],
+        isActive: (pathname) => pathname.startsWith('/expenses'),
+      },
+      {
         label: 'Reports',
-        icon: BarChart3, // Using BarChart3 for reports group
+        icon: BarChart3,
         isInitiallyOpen: false,
         subItems: [
           { href: '/reports/income-statement', label: 'Income Statement', icon: FileText },
-          // Add more report links here
         ],
         isActive: (pathname) => pathname.startsWith('/reports'),
       },
       {
-        label: 'System Settings', 
+        label: 'System Settings',
         icon: Settings,
-        href: '/admin/settings', 
+        href: '/admin/settings',
         isActive: (pathname) => pathname === '/admin/settings',
       },
     ],
@@ -119,8 +130,20 @@ export const standaloneNavItems: NavItem[] = [
       { href: '/admin', label: 'Overview', icon: Home, isActive: (pathname) => pathname === '/admin' && pathname !== '/admin/settings'},
       { href: '/admin/users', label: 'Users', icon: Users, isActive: (pathname) => pathname === '/admin/users' },
       { href: '/admin/products', label: 'Product Catalog', icon: Package, isActive: (pathname) => pathname === '/admin/products' },
-      { href: '/admin/categories', label: 'Categories', icon: ListTree, isActive: (pathname) => pathname === '/admin/categories' },
+      { href: '/admin/categories', label: 'Product Categories', icon: ListTree, isActive: (pathname) => pathname === '/admin/categories' },
+      { href: '/admin/expenses/categories', label: 'Expense Categories', icon: WalletCards, isActive: (pathname) => pathname === '/admin/expenses/categories' },
     ],
     isActive: (pathname) => pathname.startsWith('/admin') && pathname !== '/admin/settings',
   },
 ];
+
+// Helper icon for PlusCircle if not imported above
+const PlusCircle = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="16"></line>
+    <line x1="8" y1="12" x2="16" y2="12"></line>
+  </svg>
+);
+
+    

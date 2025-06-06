@@ -4,6 +4,7 @@
 import { prisma } from '@/lib/prisma';
 import type { IncomeStatementData } from '@/lib/types';
 import { endOfDay, startOfDay } from 'date-fns';
+import { Decimal } from '@prisma/client/runtime/library';
 
 export async function fetchIncomeStatementData(
   startDate: Date,
@@ -13,6 +14,7 @@ export async function fetchIncomeStatementData(
     const adjustedStartDate = startOfDay(startDate);
     const adjustedEndDate = endOfDay(endDate);
 
+    // Fetch Sales
     const sales = await prisma.sale.findMany({
       where: {
         saleDate: {
@@ -26,28 +28,41 @@ export async function fetchIncomeStatementData(
       },
     });
 
-    let totalRevenue = 0;
-    let totalCogs = 0;
+    let totalRevenue = new Decimal(0);
+    let totalCogs = new Decimal(0);
 
     sales.forEach(sale => {
-      totalRevenue += sale.grandTotal.toNumber();
+      totalRevenue = totalRevenue.plus(sale.grandTotal);
       sale.items.forEach(item => {
-        // Ensure costPriceAtSale is a number and item quantity is valid
-        const costPrice = item.costPriceAtSale?.toNumber() ?? 0;
-        totalCogs += costPrice * item.quantity;
+        const costPrice = item.costPriceAtSale ?? new Decimal(0);
+        totalCogs = totalCogs.plus(costPrice.times(item.quantity));
       });
     });
 
-    const grossProfit = totalRevenue - totalCogs;
-    // For now, operating expenses are 0
-    // const operatingExpenses = 0; 
-    const netIncome = grossProfit; // - operatingExpenses;
+    // Fetch Expenses
+    const expenses = await prisma.expense.findMany({
+      where: {
+        date: {
+          gte: adjustedStartDate,
+          lte: adjustedEndDate,
+        },
+      },
+    });
+
+    let totalOperatingExpenses = new Decimal(0);
+    expenses.forEach(expense => {
+      totalOperatingExpenses = totalOperatingExpenses.plus(expense.amount);
+    });
+
+    const grossProfit = totalRevenue.minus(totalCogs);
+    const netIncome = grossProfit.minus(totalOperatingExpenses);
 
     return {
-      revenue: totalRevenue,
-      cogs: totalCogs,
-      grossProfit: grossProfit,
-      netIncome: netIncome,
+      revenue: totalRevenue.toNumber(),
+      cogs: totalCogs.toNumber(),
+      grossProfit: grossProfit.toNumber(),
+      operatingExpenses: totalOperatingExpenses.toNumber(),
+      netIncome: netIncome.toNumber(),
       startDate: adjustedStartDate.toISOString(),
       endDate: adjustedEndDate.toISOString(),
     };
@@ -56,3 +71,5 @@ export async function fetchIncomeStatementData(
     throw new Error('Could not generate income statement.');
   }
 }
+
+    

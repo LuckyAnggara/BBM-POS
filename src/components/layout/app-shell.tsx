@@ -1,7 +1,7 @@
 
 'use client';
 import type { ReactNode } from 'react';
-import React from 'react'; // Import React for useState
+import React from 'react';
 import {
   SidebarProvider,
   Sidebar,
@@ -17,49 +17,40 @@ import {
   SidebarMenuSubButton,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarGroupContent,
+  SidebarGroupContent, // Ensure this is imported
   SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ChevronDown, LogOut, Building, Settings } from 'lucide-react';
+import { ChevronDown, LogOut, Building, Settings, Power } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { sidebarNavGroups, standaloneNavItems, type NavItem, type NavSubItem } from './nav-items';
+import { logoutUser } from '@/app/auth/actions'; // Import the server action
 
 interface AppShellProps {
   children: ReactNode;
 }
 
-// Internal component to handle state for collapsible items
 const NavItemRenderer = ({ item, pathname }: { item: NavItem; pathname: string }) => {
-  const isRouteCurrentlyActive = item.isActive ? item.isActive(pathname) : (item.href && pathname === item.href);
+  const isRouteCurrentlyActive = item.isActive ? item.isActive(pathname) : (item.href && pathname.startsWith(item.href) && (item.href === '/' ? pathname === '/' : true));
   
-  // For submenus, determine initial open state based on isInitiallyOpen or if a child route is active.
-  // For direct links, isOpen is not applicable/used for collapsing.
   const initialOpenState = item.subItems && item.subItems.length > 0 
     ? (item.isInitiallyOpen || isRouteCurrentlyActive) 
     : false;
   const [isOpen, setIsOpen] = React.useState(initialOpenState);
 
   React.useEffect(() => {
-    // Effect to re-evaluate isOpen if isInitiallyOpen or isRouteCurrentlyActive changes
-    // This is useful if navigation happens and a previously inactive group becomes active
     if (item.subItems && item.subItems.length > 0) {
       const newOpenState = item.isInitiallyOpen || (item.isActive ? item.isActive(pathname) : false);
-      // Only update if it's meant to be open due to route or initial config,
-      // but don't force close if user manually opened it and route is not active.
-      // User clicks should take precedence for toggling.
-      // This logic might need refinement based on desired UX for auto-opening/closing on route changes.
-      // For now, let's stick to initial open + manual toggle.
-      // If route becomes active, it will be set to open by isInitiallyOpen logic on re-render if NavItem key changes, or if we explicitly set it here.
-      // Let's ensure it opens if route becomes active and it wasn't already open due to manual toggle.
-      if (newOpenState && !isOpen) {
-         // setIsOpen(true); // This might be too aggressive, let's rely on initial state and manual toggle.
+      if (newOpenState && !isOpen && isRouteCurrentlyActive) { 
+         setIsOpen(true);
+      } else if (!newOpenState && isOpen && !isRouteCurrentlyActive && !item.isInitiallyOpen) {
+         // Optional: auto-close if route is no longer active and not set to be initially open
+         // setIsOpen(false); 
       }
     }
-  }, [pathname, item, isOpen]);
-
+  }, [pathname, item, isOpen, isRouteCurrentlyActive]);
 
   const handleToggle = () => {
     if (item.subItems && item.subItems.length > 0) {
@@ -72,13 +63,13 @@ const NavItemRenderer = ({ item, pathname }: { item: NavItem; pathname: string }
       <SidebarMenuItem 
         key={item.label} 
         className="relative"
-        data-state={isOpen ? 'open' : 'closed'} // This drives the animation
+        data-state={isOpen ? 'open' : 'closed'}
       >
         <SidebarMenuButton
           className="justify-between"
           asChild={false}
-          isActive={isRouteCurrentlyActive} // For highlighting based on route
-          onClick={handleToggle} // Handles opening/closing submenu
+          isActive={isRouteCurrentlyActive}
+          onClick={handleToggle}
           tooltip={{ content: item.label, side: 'right', align: 'center' }}
         >
           <span className="flex items-center gap-2">
@@ -106,7 +97,6 @@ const NavItemRenderer = ({ item, pathname }: { item: NavItem; pathname: string }
     );
   }
 
-  // For items without subItems
   return (
     <SidebarMenuItem key={item.href || item.label}>
       <Link href={item.href || '#'} legacyBehavior passHref>
@@ -128,6 +118,12 @@ const NavItemRenderer = ({ item, pathname }: { item: NavItem; pathname: string }
 
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
+  // If on login page, don't render AppShell, or render minimal version
+  // This logic is now handled by middleware redirecting to /login,
+  // so AppShell should only render for authenticated routes.
+  // If you want /login to have a different layout, it should not use this AppShell.
+  // We can achieve this by making login page its own root layout or by conditional rendering here.
+  // For now, assuming middleware protects AppShell routes.
 
   return (
     <SidebarProvider defaultOpen>
@@ -169,29 +165,36 @@ export function AppShell({ children }: AppShellProps) {
         </SidebarContent>
         
         <SidebarFooter className="p-3 border-t border-sidebar-border">
-          <div className="flex items-center gap-2.5">
+           <div className="flex items-center gap-2.5 mb-2">
             <Avatar className="h-8 w-8">
               <AvatarImage src="https://placehold.co/80x80/7F56D9/FFFFFF.png?text=AU" alt="Admin User" data-ai-hint="user initial" />
               <AvatarFallback>AU</AvatarFallback>
             </Avatar>
             <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-              <span className="text-sm font-medium text-sidebar-foreground leading-tight">Admin User</span>
+              <span className="text-sm font-medium text-sidebar-foreground leading-tight">Admin User</span> {/* Placeholder, update with real user data later */}
               <span className="text-xs text-sidebar-foreground/70 leading-tight">admin@stockpilot.com</span>
             </div>
-            <Button variant="ghost" size="icon" className="ml-auto text-sidebar-foreground/70 hover:text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-              <Settings className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className="ml-auto text-sidebar-foreground/70 hover:text-sidebar-foreground group-data-[collapsible=icon]:hidden" asChild>
+                <Link href="/admin/settings"><Settings className="h-4 w-4" /></Link>
             </Button>
              <Button variant="ghost" size="icon" className="ml-auto text-sidebar-foreground/70 hover:text-sidebar-foreground group-data-[collapsible=icon]:flex hidden"
-                     tooltip={{content: 'User Settings', side: 'right', align: 'center' }}>
-              <Settings className="h-4 w-4" />
+                     tooltip={{content: 'User Settings', side: 'right', align: 'center' }} asChild>
+               <Link href="/admin/settings"><Settings className="h-4 w-4" /></Link>
             </Button>
           </div>
+          <form action={logoutUser} className="w-full">
+            <Button variant="ghost" type="submit" className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+                <Power className="mr-2 h-4 w-4 group-data-[collapsible=icon]:mr-0" />
+                <span className="group-data-[collapsible=icon]:hidden">Logout</span>
+            </Button>
+          </form>
         </SidebarFooter>
       </Sidebar>
       
       <SidebarInset className="flex flex-col">
         <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background/80 px-6 backdrop-blur-sm">
           <SidebarTrigger />
+          {/* Future: Breadcrumbs or page title can go here */}
         </header>
         <main className="flex-1 overflow-auto p-6">
           {children}

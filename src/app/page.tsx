@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,9 +36,10 @@ export default function DashboardPage() {
     fetchProducts();
   }, [fetchProducts]);
 
-  const totalProducts = products.length;
-  const totalStockQuantity = products.reduce((sum, p) => sum + p.quantity, 0);
-  const totalStockValue = products.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+  const safeProducts = products || [];
+  const totalProducts = safeProducts.length;
+  const totalStockQuantity = safeProducts.reduce((sum, p) => sum + p.quantity, 0);
+  const totalStockValue = safeProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
 
   // Placeholder data for other stats until their stores are implemented
   const totalSalesToday = 1250.75;
@@ -89,9 +91,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
           {inventoryLoading ? <p>Loading...</p> : 
-            products.filter(p => p.lowStockThreshold && p.quantity < p.lowStockThreshold).length > 0 ? (
+            (safeProducts || []).filter(p => p.lowStockThreshold && p.quantity < p.lowStockThreshold).length > 0 ? (
               <ul className="space-y-2">
-                {products.filter(p => p.lowStockThreshold && p.quantity < p.lowStockThreshold).slice(0,5).map(p => (
+                {(safeProducts || []).filter(p => p.lowStockThreshold && p.quantity < p.lowStockThreshold).slice(0,5).map(p => (
                   <li key={p.id} className="text-sm flex justify-between">
                     <span>{p.name}</span>
                     <span className="font-semibold text-destructive">{p.quantity} left</span>

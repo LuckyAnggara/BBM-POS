@@ -131,7 +131,7 @@ export default function InvoicePage() {
               <div className="md:text-right">
                 <h3 className="font-semibold mb-1 text-gray-600">Payment Details:</h3>
                 <p><span className="text-muted-foreground">Method:</span> {sale.paymentMethod || 'N/A'}</p>
-                <p><span className="text-muted-foreground">Status:</span> <Badge variant={sale.status === 'Completed' ? 'default' : 'outline'} className={`text-xs px-1.5 py-0.5 ${sale.status === 'Completed' ? 'bg-green-500/20 text-green-700' : 'bg-yellow-500/20 text-yellow-700'}`}>{sale.status}</Badge></p>
+                <div><p><span className="text-muted-foreground">Status:</span></p> <Badge variant={sale.status === 'Completed' ? 'default' : 'outline'} className={`text-xs px-1.5 py-0.5 ${sale.status === 'Completed' ? 'bg-green-500/20 text-green-700' : 'bg-yellow-500/20 text-yellow-700'}`}>{sale.status}</Badge></div>
                 {sale.user?.name && <p><span className="text-muted-foreground">Cashier:</span> {sale.user.name}</p>}
               </div>
             </div>

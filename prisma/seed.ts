@@ -1,3 +1,4 @@
+
 import { PrismaClient, Category, Product, User, Sale, PurchaseOrder } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -6,49 +7,98 @@ const prisma = new PrismaClient();
 async function seedUsers() {
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
-    update: {},
-    create: { name: 'Admin', email: 'admin@example.com', role: 'ADMIN' },
+    update: {
+      // Ensure fields are updated if user exists but ID needs to conform
+      name: 'Admin User Alice', // Consistent name
+      role: 'ADMIN',
+    },
+    create: {
+      id: 'user_admin_alice', // Explicitly set ID
+      name: 'Admin User Alice',
+      email: 'admin@example.com',
+      role: 'ADMIN',
+      isActive: true,
+    },
   });
 
   const staff = await prisma.user.upsert({
     where: { email: 'staff@example.com' },
-    update: {},
-    create: { name: 'Staff', email: 'staff@example.com', role: 'STAFF' },
+    update: {
+      name: 'Staff User Charlie', // Consistent name
+      role: 'STAFF',
+    },
+    create: {
+      id: 'user_staff_charlie', // Explicitly set ID
+      name: 'Staff User Charlie',
+      email: 'staff@example.com',
+      role: 'STAFF',
+      isActive: true,
+    },
   });
 
   return { admin, staff };
 }
 
 async function seedCategories() {
-  const electronics = await prisma.category.create({ data: { name: 'Electronics' } });
-  const groceries = await prisma.category.create({ data: { name: 'Groceries' } });
+  const electronics = await prisma.category.upsert({
+    where: { name: 'Electronics' },
+    update: {},
+    create: { name: 'Electronics' },
+  });
+  const groceries = await prisma.category.upsert({
+    where: { name: 'Groceries' },
+    update: {},
+    create: { name: 'Groceries' },
+  });
   return { electronics, groceries };
 }
 
 async function seedProducts(categories: Record<string, Category>) {
-  const product1 = await prisma.product.create({
-    data: {
+  const product1 = await prisma.product.upsert({
+    where: { sku: 'MOUSE001' },
+    update: {
+        name: 'Wireless Mouse',
+        quantity: 50,
+        price: new Decimal(15.99),
+        costPrice: new Decimal(10.0),
+        supplier: 'TechSupplier Inc.',
+        tags: JSON.stringify(['electronics', 'computer']),
+        categoryId: categories.electronics.id,
+    },
+    create: {
       name: 'Wireless Mouse',
       sku: 'MOUSE001',
       quantity: 50,
       price: new Decimal(15.99),
       costPrice: new Decimal(10.0),
       supplier: 'TechSupplier Inc.',
-      tags: JSON.stringify(['electronics']),
+      tags: JSON.stringify(['electronics', 'computer']),
       categoryId: categories.electronics.id,
+      lowStockThreshold: 5,
     },
   });
 
-  const product2 = await prisma.product.create({
-    data: {
+  const product2 = await prisma.product.upsert({
+     where: { sku: 'APPLE001' },
+     update: {
+        name: 'Organic Apples',
+        quantity: 100,
+        price: new Decimal(2.5),
+        costPrice: new Decimal(1.5),
+        supplier: 'FarmFresh Co.',
+        tags: JSON.stringify(['fruit', 'organic']),
+        categoryId: categories.groceries.id,
+     },
+    create: {
       name: 'Organic Apples',
       sku: 'APPLE001',
       quantity: 100,
       price: new Decimal(2.5),
       costPrice: new Decimal(1.5),
       supplier: 'FarmFresh Co.',
-      tags: JSON.stringify(['fruit']),
+      tags: JSON.stringify(['fruit', 'organic']),
       categoryId: categories.groceries.id,
+      lowStockThreshold: 10,
     },
   });
 
@@ -56,6 +106,12 @@ async function seedProducts(categories: Record<string, Category>) {
 }
 
 async function seedPurchaseOrders(users: Record<string, User>, products: Record<string, Product>) {
+  const existingPo = await prisma.purchaseOrder.findUnique({ where: { poNumber: 'PO1001' }});
+  if (existingPo) {
+    console.log('PO1001 already exists, skipping PO seed or use it.');
+    return { po: existingPo };
+  }
+
   const po = await prisma.purchaseOrder.create({
     data: {
       poNumber: 'PO1001',
@@ -63,7 +119,7 @@ async function seedPurchaseOrders(users: Record<string, User>, products: Record<
       orderDate: new Date(),
       status: 'Ordered',
       totalAmount: new Decimal(300),
-      createdById: users.admin.id,
+      createdById: users.admin.id, // Use the seeded admin's actual ID
       items: {
         create: [{
           productId: products.product1.id,
@@ -80,9 +136,17 @@ async function seedPurchaseOrders(users: Record<string, User>, products: Record<
 }
 
 async function seedSales(users: Record<string, User>, products: Record<string, Product>) {
-  const customer = await prisma.customer.create({
-    data: { name: 'John Doe', email: 'johndoe@example.com' },
+  const customer = await prisma.customer.upsert({
+    where: { email: 'johndoe@example.com' },
+    update: {},
+    create: { name: 'John Doe', email: 'johndoe@example.com' },
   });
+
+  const existingSale = await prisma.sale.findUnique({ where: { saleNumber: 'S1001' }});
+  if (existingSale) {
+    console.log('S1001 already exists, skipping Sale seed or use it.');
+    return { sale: existingSale };
+  }
 
   const sale = await prisma.sale.create({
     data: {
@@ -90,12 +154,15 @@ async function seedSales(users: Record<string, User>, products: Record<string, P
       saleDate: new Date(),
       customerId: customer.id,
       customerName: customer.name,
-      userId: users.staff.id,
+      userId: users.staff.id, // Use the seeded staff's actual ID
       subtotal: new Decimal(31.98),
+      discountAmount: new Decimal(0),
       taxPercent: new Decimal(10),
       taxAmount: new Decimal(3.2),
+      shippingCost: new Decimal(0),
       grandTotal: new Decimal(35.18),
       status: 'Completed',
+      paymentMethod: 'Cash',
       items: {
         create: [{
           productId: products.product1.id,
@@ -118,14 +185,24 @@ async function seedStockMovements(
   purchaseOrders: Record<string, PurchaseOrder>,
   sales: Record<string, Sale>
 ) {
+  // Clear existing stock movements for idempotency if re-running seed for these specific test movements
+  await prisma.stockMovement.deleteMany({
+    where: {
+      OR: [
+        { referenceId: purchaseOrders.po.id, type: 'PURCHASE_RECEIPT' },
+        { referenceId: sales.sale.id, type: 'SALE' },
+      ]
+    }
+  });
+
   await prisma.stockMovement.createMany({
     data: [
       {
         productId: products.product1.id,
         type: 'PURCHASE_RECEIPT',
         quantityChange: 30,
-        quantityBefore: 50,
-        quantityAfter: 80,
+        quantityBefore: 50, // Assuming product1 starts at 50 before this PO receipt
+        quantityAfter: 80,  // 50 + 30
         reason: `PO #${purchaseOrders.po.poNumber} Received`,
         referenceId: purchaseOrders.po.id,
         userId: users.admin.id,
@@ -134,8 +211,8 @@ async function seedStockMovements(
         productId: products.product1.id,
         type: 'SALE',
         quantityChange: -2,
-        quantityBefore: 80,
-        quantityAfter: 78,
+        quantityBefore: 80, // After PO receipt
+        quantityAfter: 78,  // 80 - 2
         reason: `Sale #${sales.sale.saleNumber}`,
         referenceId: sales.sale.id,
         userId: users.staff.id,
@@ -149,8 +226,18 @@ async function main() {
 
   await prisma.appSettings.upsert({
     where: { id: 'main_settings' },
-    update: {},
-    create: {},
+    update: {}, // Define any updates if necessary
+    create: {
+      id: 'main_settings',
+      appName: 'StockPilot',
+      dateFormat: 'MM/dd/yyyy',
+      timeZone: 'America/New_York',
+      defaultCurrency: 'USD',
+      emailNotifications: true,
+      lowStockAlerts: true,
+      newOrderAlerts: false,
+      defaultTaxRate: 7.5, // Example default tax rate
+    },
   });
 
   const users = await seedUsers();
@@ -158,6 +245,20 @@ async function main() {
   const products = await seedProducts(categories);
   const purchaseOrders = await seedPurchaseOrders(users, products);
   const sales = await seedSales(users, products);
+  
+  // It's important that stock levels are consistent before running seedStockMovements.
+  // This example assumes product1.quantity (50) is its state *before* the PO receipt and sale.
+  // If seedProducts itself sets quantity based on some logic, ensure quantityBefore is accurate.
+  // For simplicity, we'll assume the product quantities from seedProducts are their initial state.
+  // The stock movements here will reflect changes from that initial state.
+  
+  // Let's ensure product1's quantity is set to its starting point before these specific movements are logged.
+  // This makes the seed more idempotent for the stock movement part.
+  await prisma.product.update({
+    where: { id: products.product1.id },
+    data: { quantity: 50 } // Resetting to initial quantity for reliable movement calculation
+  });
+
   await seedStockMovements(users, products, purchaseOrders, sales);
 
   console.log('✅ Seeding finished.');

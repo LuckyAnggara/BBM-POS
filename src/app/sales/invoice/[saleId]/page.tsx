@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { ArrowLeft, Printer, Building, UserCircle, Hash, CalendarDays, CreditCard, FileText, ShoppingBag, Percent, Truck, DollarSign } from 'lucide-react';
-import type { Sale } from '@/lib/types';
+import type { Sale, SaleStatus } from '@/lib/types';
 import { fetchSaleById } from '../../actions';
 import { Badge } from '@/components/ui/badge';
 
@@ -22,6 +22,14 @@ const companyDetails = {
   email: 'contact@stockpilot.com',
   logoUrl: 'https://placehold.co/150x50.png?text=StockPilot' // data-ai-hint="company logo"
 };
+
+const saleStatusColors: Record<SaleStatus, string> = {
+  'Completed': 'bg-green-500/20 text-green-700 border-green-500/30',
+  'PendingPayment': 'bg-yellow-500/20 text-yellow-700 border-yellow-500/30',
+  'Refunded': 'bg-purple-500/20 text-purple-700 border-purple-500/30',
+  'Cancelled': 'bg-gray-500/20 text-gray-700 border-gray-500/30',
+};
+
 
 export default function InvoicePage() {
   const router = useRouter();
@@ -83,7 +91,6 @@ export default function InvoicePage() {
   }
 
   if (!sale) {
-    // This state should ideally be brief or handled by redirect in useEffect
     return <div className="container mx-auto p-4 md:p-8">Sale not found or failed to load.</div>;
   }
 
@@ -116,6 +123,12 @@ export default function InvoicePage() {
                 <div className="text-sm text-muted-foreground">
                   <span className="font-semibold">Date:</span> {format(parseISO(sale.saleDate), 'PPP')}
                 </div>
+                 <Badge 
+                    variant={sale.status === 'Completed' ? 'default' : 'outline'} 
+                    className={`text-xs mt-1 px-2 py-1 ${saleStatusColors[sale.status as SaleStatus] || saleStatusColors['Cancelled']}`}
+                  >
+                    Status: {sale.status}
+                  </Badge>
               </div>
             </div>
           </CardHeader>
@@ -131,7 +144,7 @@ export default function InvoicePage() {
               <div className="md:text-right">
                 <h3 className="font-semibold mb-1 text-gray-600">Payment Details:</h3>
                 <p><span className="text-muted-foreground">Method:</span> {sale.paymentMethod || 'N/A'}</p>
-                <div><p><span className="text-muted-foreground">Status:</span></p> <Badge variant={sale.status === 'Completed' ? 'default' : 'outline'} className={`text-xs px-1.5 py-0.5 ${sale.status === 'Completed' ? 'bg-green-500/20 text-green-700' : 'bg-yellow-500/20 text-yellow-700'}`}>{sale.status}</Badge></div>
+                {/* Status is now shown with Invoice # */}
                 {sale.user?.name && <p><span className="text-muted-foreground">Cashier:</span> {sale.user.name}</p>}
               </div>
             </div>

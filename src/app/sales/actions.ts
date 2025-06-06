@@ -2,7 +2,10 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import type { Sale, Customer, User, Product, Category } from '@/lib/types';
+import type { Sale, Customer, User, Product, Category, StockMovementType, SaleStatus } from '@/lib/types';
+import { StockMovementTypeEnum } from '@/lib/types';
+import { getSession } from '@/lib/auth-utils';
+import { revalidatePath } from 'next/cache';
 
 // Helper to map Prisma User to App User type
 const mapPrismaUserToAppUser = (prismaUser: any): User | undefined => {
@@ -68,7 +71,7 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
     shippingCost: dbSale.shippingCost.toNumber(),
     grandTotal: dbSale.grandTotal.toNumber(),
     paymentMethod: dbSale.paymentMethod,
-    status: dbSale.status,
+    status: dbSale.status as SaleStatus,
     notes: dbSale.notes,
     createdAt: dbSale.createdAt.toISOString(),
     updatedAt: dbSale.updatedAt.toISOString(),
@@ -155,4 +158,95 @@ export async function fetchSaleById(saleId: string): Promise<Sale | null> {
     console.error(`Failed to fetch sale with ID ${saleId}:`, error);
     throw new Error('Could not fetch sale details.');
   }
+}
+
+export async function refundSaleAction(saleId: string): Promise<Sale> {
+  const session = await getSession();
+  if (!session?.user?.id) {
+    throw new Error("User not authenticated or session invalid for refund action.");
+  }
+  const userId = session.user.id;
+
+  return await prisma.$transaction(async (tx) => {
+    const saleToRefund = await tx.sale.findUnique({
+      where: { id: saleId },
+      include: { items: { include: { product: true } } },
+    });
+
+    if (!saleToRefund) {
+      throw new Error(`Sale with ID ${saleId} not found.`);
+    }
+
+    if (saleToRefund.status === 'Refunded') {
+      throw new Error(`Sale ${saleToRefund.saleNumber} is already refunded.`);
+    }
+    if (saleToRefund.status === 'Cancelled') {
+      throw new Error(`Sale ${saleToRefund.saleNumber} is cancelled and cannot be refunded.`);
+    }
+
+    // Update sale status to Refunded
+    const updatedSale = await tx.sale.update({
+      where: { id: saleId },
+      data: { status: 'Refunded' },
+      include: {
+        items: { include: { product: { include: { category: true } } } },
+        customer: true,
+        user: true,
+      },
+    });
+
+    // Increase stock for each item in the sale
+    for (const item of saleToRefund.items) {
+      if (!item.product) {
+        console.warn(`Product details missing for item ID ${item.id} in sale ${saleId}. Skipping stock update for this item.`);
+        continue;
+      }
+      
+      const productToUpdate = await tx.product.findUnique({ where: { id: item.productId }});
+      if (!productToUpdate) {
+          throw new Error(`Product ${item.productName} (ID: ${item.productId}) not found for stock return.`);
+      }
+
+      const quantityBefore = productToUpdate.quantity;
+      const quantityAfter = quantityBefore + item.quantity;
+
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { quantity: quantityAfter },
+      });
+
+      await tx.stockMovement.create({
+        data: {
+          productId: item.productId,
+          type: StockMovementTypeEnum.RETURN_CUSTOMER,
+          quantityChange: item.quantity, // Positive for increase
+          quantityBefore,
+          quantityAfter,
+          reason: `Return from Sale #${saleToRefund.saleNumber}`,
+          referenceId: saleToRefund.id,
+          userId: userId, // User performing the refund
+        },
+      });
+    }
+
+    revalidatePath('/sales/history');
+    revalidatePath(`/sales/invoice/${saleId}`);
+    revalidatePath('/inventory');
+    saleToRefund.items.forEach(item => {
+      revalidatePath(`/inventory/${item.productId}`);
+      revalidatePath(`/inventory/${item.productId}/history`);
+       if (item.product?.category?.name) {
+            revalidatePath(`/inventory?category=${encodeURIComponent(item.product.category.name)}`);
+        }
+    });
+    revalidatePath('/admin/products');
+
+    return mapPrismaSaleToAppSale(updatedSale);
+  }).catch(error => {
+    console.error(`Failed to refund sale ${saleId}:`, error);
+    if (error instanceof Error) {
+        throw error;
+    }
+    throw new Error('Could not process refund.');
+  });
 }

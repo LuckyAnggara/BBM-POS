@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye, Search, Filter, Download, History, FileText, DollarSign, Users, ShoppingBag, FileSpreadsheet, CalendarIcon, X } from "lucide-react";
+import { Eye, Search, Filter, Download, History, FileText, DollarSign, Users, ShoppingBag, FileSpreadsheet, CalendarIcon, X, MoreHorizontal, RotateCcw, PackageCheck, PackageX } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from '@/components/ui/input';
 import {
@@ -35,13 +35,21 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format, parseISO, isValid } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Sale } from '@/lib/types';
-import { fetchSalesHistory, type SalesHistoryFilters } from '../actions';
+import type { Sale, SaleStatus } from '@/lib/types';
+import { fetchSalesHistory, type SalesHistoryFilters, refundSaleAction } from '../actions';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const paymentMethodOptions = ['All Methods', 'Cash', 'Credit Card', 'VISA', 'Mastercard']; // Add more as needed
-const saleStatusOptions = ['All Statuses', 'Completed', 'PendingPayment', 'Refunded', 'Cancelled'];
+const saleStatusOptions: Array<SaleStatus | 'All Statuses'> = ['All Statuses', 'Completed', 'PendingPayment', 'Refunded', 'Cancelled'];
 
 const paymentMethodColors: Record<string, string> = {
   'Cash': 'bg-green-100 text-green-800 border-green-300',
@@ -50,10 +58,10 @@ const paymentMethodColors: Record<string, string> = {
   'Mastercard': 'bg-orange-100 text-orange-800 border-orange-300',
 };
 
-const saleStatusColors: Record<string, string> = {
+const saleStatusColors: Record<SaleStatus, string> = {
   'Completed': 'bg-green-500/20 text-green-700 border-green-500/30',
   'PendingPayment': 'bg-yellow-500/20 text-yellow-700 border-yellow-500/30',
-  'Refunded': 'bg-red-500/20 text-red-700 border-red-500/30',
+  'Refunded': 'bg-purple-500/20 text-purple-700 border-purple-500/30', // New color for Refunded
   'Cancelled': 'bg-gray-500/20 text-gray-700 border-gray-500/30',
 };
 
@@ -61,6 +69,7 @@ const saleStatusColors: Record<string, string> = {
 export default function SalesHistoryPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessingRefund, setIsProcessingRefund] = useState<string | null>(null); // Store saleId being refunded
   const [searchTerm, setSearchTerm] = useState('');
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
@@ -90,7 +99,6 @@ export default function SalesHistoryPage() {
     loadSales(filters);
   }, [loadSales, filters]); 
   
-  // Update tempFilters when main filters change (e.g. on clear)
   useEffect(() => {
     setTempFilters(filters);
   }, [filters]);
@@ -109,7 +117,7 @@ export default function SalesHistoryPage() {
         paymentMethod: 'All Methods',
     };
     setTempFilters(cleared);
-    setFilters(cleared); // Apply cleared filters immediately
+    setFilters(cleared); 
     setIsSheetOpen(false);
   };
   
@@ -127,6 +135,25 @@ export default function SalesHistoryPage() {
     (sale.customerName && sale.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (sale.user?.name && sale.user.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const handleRefundSale = async (saleId: string, saleNumber: string) => {
+    setIsProcessingRefund(saleId);
+    try {
+      await refundSaleAction(saleId);
+      toast.success(`Sale ${saleNumber} has been refunded and stock updated.`);
+      loadSales(filters); // Reload sales to reflect the change
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error(`Failed to refund sale ${saleNumber}.`);
+      }
+      console.error("Refund error:", error);
+    } finally {
+      setIsProcessingRefund(null);
+    }
+  };
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -336,19 +363,42 @@ export default function SalesHistoryPage() {
                     <TableCell className="text-xs">
                       <Badge 
                         variant={sale.status === 'Completed' ? 'default' : 'outline'} 
-                        className={`text-xs px-2 py-0.5 ${saleStatusColors[sale.status] || saleStatusColors['Cancelled']}`}
+                        className={`text-xs px-2 py-0.5 ${saleStatusColors[sale.status as SaleStatus] || saleStatusColors['Cancelled']}`}
                       >
                         {sale.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-semibold text-xs">${sale.grandTotal.toFixed(2)}</TableCell>
                     <TableCell className="text-center">
-                       <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-                         <Link href={`/sales/invoice/${sale.id}`}>
-                           <FileSpreadsheet className="h-4 w-4" />
-                           <span className="sr-only">View Invoice</span>
-                         </Link>
-                       </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isProcessingRefund === sale.id}>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/sales/invoice/${sale.id}`}>
+                              <FileSpreadsheet className="mr-2 h-4 w-4" /> View Invoice
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => toast.warning(
+                                `Are you sure you want to refund sale ${sale.saleNumber}? This action cannot be undone.`,
+                                {
+                                    action: { label: "Confirm Refund", onClick: () => handleRefundSale(sale.id, sale.saleNumber) },
+                                    cancel: { label: "Cancel" }
+                                }
+                            )}
+                            disabled={sale.status === 'Refunded' || sale.status === 'Cancelled' || isProcessingRefund === sale.id}
+                            className="text-amber-600 focus:text-amber-700 focus:bg-amber-500/10"
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" /> 
+                            {isProcessingRefund === sale.id ? 'Refunding...' : 'Refund Sale'}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}

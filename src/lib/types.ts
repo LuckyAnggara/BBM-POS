@@ -115,12 +115,14 @@ export interface SaleItem extends Omit<PrismaSaleItem, 'createdAt' | 'updatedAt'
   updatedAt: string;
 }
 
+export type SaleStatus = 'PendingPayment' | 'Completed' | 'Refunded' | 'Cancelled' | string; // Added Refunded
+
 export interface Sale extends Omit<PrismaSale, 'createdAt' | 'updatedAt' | 'saleDate' | 'customer' | 'user' | 'items' | 'status'> {
   saleDate: string; // ISO date string
   customer?: Customer | null;
   user?: User; // Cashier/Seller
   items: SaleItem[];
-  status: string; // Not optional, will default to "Completed"
+  status: SaleStatus; 
   paymentMethod?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -131,10 +133,10 @@ export type SaleItemDataForCreation = Omit<SaleItem, 'id' | 'createdAt' | 'updat
 
 export type SaleDataForCreation = Omit<Sale, 'id' | 'saleNumber' | 'createdAt' | 'updatedAt' | 'items' | 'user' | 'customer' | 'saleDate' | 'status'> & {
   customerId?: string; 
-  userId: string; 
+  // userId: string; // Removed, will be taken from session
   cartItems: CartItem[]; 
   paymentMethod: string; 
-  status?: string; 
+  status?: SaleStatus; 
 };
 
 // Stock Movement Types

@@ -8,6 +8,7 @@ const PUBLIC_ROUTES = ['/login']; // Routes accessible without auth
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionCookie = request.cookies.get('auth_session');
+  console.info(sessionCookie)
   const isAuthenticated = !!sessionCookie;
 
   // Determine if the current path is a protected route

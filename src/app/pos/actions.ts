@@ -2,10 +2,11 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import type { Customer, Sale, CartItem, SaleDataForCreation, Product, User, StockMovementTypeEnum, Category } from '@/lib/types';
+import type { Customer, Sale, CartItem, SaleDataForCreation, Product, User } from '@/lib/types'; // Removed StockMovementTypeEnum as it's not directly used here, will use string 'SALE'
+import { StockMovementTypeEnum } from '@/lib/types'; // Explicitly import for use
 import { revalidatePath } from 'next/cache';
-import { decreaseProductStockAction } from '@/app/inventory/actions';
-import { getSession } from '@/lib/auth-utils'; // Import getSession
+// Removed: import { decreaseProductStockAction } from '@/app/inventory/actions';
+import { getSession } from '@/lib/auth-utils';
 
 const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer | null => {
   if (!dbCustomer) return null;
@@ -124,9 +125,15 @@ export async function findOrCreateCustomer(
     }
 
     if (!customer && name) {
-      customer = await prisma.customer.findFirst({
+      // Try to find by name if not found by email
+      const customersByName = await prisma.customer.findMany({
         where: { name },
       });
+      // If multiple customers have the same name, this might need more specific logic
+      // For now, taking the first one or allowing creation if none perfectly match.
+      if (customersByName.length > 0) {
+        customer = customersByName[0]; // Or implement logic to select/confirm
+      }
     }
 
     if (!customer) {
@@ -155,12 +162,11 @@ function generateSaleNumber(): string {
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const seconds = String(now.getSeconds()).padStart(2, '0');
-  const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `SALE-${year}${month}${day}-${hours}${minutes}${seconds}-${randomSuffix}`;
+  const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase(); // Shortened for brevity
+  return `SL-${year}${month}${day}-${hours}${minutes}${seconds}-${randomSuffix}`;
 }
 
 export async function recordSale(
-  // userId is removed from parameters, will be fetched from session
   saleData: Omit<SaleDataForCreation, 'userId'>,
 ): Promise<Sale> {
   const session = await getSession();
@@ -218,7 +224,7 @@ export async function recordSale(
         paymentMethod,
         status,
         ...(customerId && { customerId: customerId }),
-        userId, // Use userId from session
+        userId,
         items: {
           create: saleItemsData,
         },
@@ -230,24 +236,53 @@ export async function recordSale(
         },
     });
 
+    // Decrease stock and log movement directly within this transaction
     for (const item of createdSale.items) {
-      await decreaseProductStockAction(
-        item.productId,
-        item.quantity,
-        'SALE',
-        `Sale #${createdSale.saleNumber}`,
-        createdSale.id,
-        userId // Pass userId from session to stock action
-      );
+      const product = productMap.get(item.productId); // Use already fetched product info
+      if (!product) {
+        // This should not happen if stock check passed, but as a safeguard
+        throw new Error(`Product with ID ${item.productId} not found during stock update for sale ${createdSale.saleNumber}.`);
+      }
+
+      const quantityBefore = product.quantity;
+      const quantityAfter = quantityBefore - item.quantity;
+
+      // The initial stock check should prevent quantityAfter < 0
+      // If it still happens, it indicates a race condition or a flaw in initial check
+      if (quantityAfter < 0) {
+        throw new Error(`Stock for ${item.productName} would go below zero. Transaction rolled back.`);
+      }
+      
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { quantity: quantityAfter },
+      });
+
+      await tx.stockMovement.create({
+        data: {
+          productId: item.productId,
+          type: StockMovementTypeEnum.SALE, // Use enum
+          quantityChange: -item.quantity,
+          quantityBefore,
+          quantityAfter,
+          reason: `Sale #${createdSale.saleNumber}`,
+          referenceId: createdSale.id,
+          userId, // userId from session
+        },
+      });
     }
 
     revalidatePath('/pos');
     revalidatePath('/sales/history');
-    cartItems.forEach(item => {
+    revalidatePath('/inventory'); // General inventory revalidation
+    createdSale.items.forEach(item => { // More specific revalidations
         revalidatePath(`/inventory/${item.productId}`);
         revalidatePath(`/inventory/${item.productId}/history`);
+        if (item.product?.category?.name) {
+            revalidatePath(`/inventory?category=${encodeURIComponent(item.product.category.name)}`);
+        }
     });
-    revalidatePath('/inventory');
+    revalidatePath('/admin/products'); // For admin product list view
 
     return mapPrismaSaleToAppSale(createdSale);
   }).catch(error => {
@@ -262,3 +297,5 @@ export async function recordSale(
     throw new Error('Could not record sale.');
   });
 }
+
+    

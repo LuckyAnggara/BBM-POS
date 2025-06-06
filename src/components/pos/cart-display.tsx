@@ -2,7 +2,7 @@
 'use client';
 import { useCartStore } from '@/store/cart-store';
 import { useInventoryStore } from '@/store/inventory-store';
-import type { CartItem } from '@/lib/types';
+import type { CartItem, SaleDataForCreation, Customer } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
@@ -13,6 +13,10 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useState } from 'react';
+import { findOrCreateCustomer, recordSale } from '@/app/pos/actions';
+
+// Use an existing active user ID from your seed data
+const MOCK_USER_ID = 'user_staff_charlie'; 
 
 export function CartDisplay() {
   const { 
@@ -41,6 +45,7 @@ export function CartDisplay() {
 
     setIsCheckingOut(true);
 
+    // Step 1: Validate stock for all items
     for (const item of items) {
       const productInInventory = getProductById(item.productId);
       if (!productInInventory || productInInventory.quantity < item.quantity) {
@@ -50,15 +55,43 @@ export function CartDisplay() {
       }
     }
     
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate payment
+    // Step 2: Find or create customer
+    let foundCustomer: Customer | null = null;
+    if (customerName.trim()) {
+      try {
+        foundCustomer = await findOrCreateCustomer(customerName.trim());
+      } catch (error) {
+        console.error("Failed to find or create customer:", error);
+        toast.error("Could not process customer information. Please try again.");
+        setIsCheckingOut(false);
+        return;
+      }
+    }
+
+    // Step 3: Prepare sale data
+    const currentSubtotalVal = subtotal();
+    const saleDataPayload: SaleDataForCreation = {
+      userId: MOCK_USER_ID, 
+      cartItems: items,
+      subtotal: currentSubtotalVal,
+      discountAmount,
+      taxPercent,
+      shippingCost,
+      customerName: customerName.trim() || undefined,
+      customerId: foundCustomer?.id || undefined,
+    };
 
     try {
+      // Step 4: Record the sale
+      const recordedSale = await recordSale(saleDataPayload);
+
+      // Step 5: Decrease stock for each item
       for (const item of items) {
         await decreaseStock(item.productId, item.quantity);
       }
 
-      toast.success("Checkout successful!", {
-          description: `${customerName ? `Customer: ${customerName}. ` : ''}Total: $${grandTotal().toFixed(2)} for ${totalItems()} items.`
+      toast.success(`Sale ${recordedSale.saleNumber} successful!`, {
+          description: `${customerName ? `Customer: ${customerName}. ` : ''}Total: $${recordedSale.grandTotal.toFixed(2)} for ${totalItems()} items.`
       });
       clearCart();
       setCustomerName('');

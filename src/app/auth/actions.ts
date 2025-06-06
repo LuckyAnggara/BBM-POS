@@ -50,17 +50,3 @@ export async function logoutUser() {
   cookies().delete('auth_session');
   redirect('/login');
 }
-
-export async function getSession(): Promise<{ user: User; session: string } | null> {
-  const sessionCookie = cookies().get('auth_session');
-  if (!sessionCookie) {
-    return null;
-  }
-  try {
-    const parsedSession = JSON.parse(sessionCookie.value) as User; 
-    return { user: parsedSession, session: sessionCookie.value };
-  } catch (error) {
-    console.error('Failed to parse session cookie:', error);
-    return null;
-  }
-}

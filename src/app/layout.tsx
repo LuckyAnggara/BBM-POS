@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { Toaster as SonnerToaster } from 'sonner';
 import { AppShell } from '@/components/layout/app-shell';
 import './globals.css';
-import { getSession } from '@/app/auth/actions'; // Import getSession
+import { getSession } from '@/lib/auth-utils'; // Updated import path
 import LoginPage from './login/page'; // Import login page for conditional rendering
 
 export const metadata: Metadata = {

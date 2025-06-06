@@ -86,16 +86,21 @@
   body {
     @apply bg-background text-foreground;
   }
+  main {
+    height: calc(100vh - theme(spacing.16)); /* Example for a fixed header height of 4rem */
+     /* Ensure main content area has some padding */
+  }
 }
 
 @media print {
   body * {
     visibility: hidden;
   }
-  #invoice-content, #invoice-content * {
+  #invoice-content, #invoice-content *,
+  .report-print-area, .report-print-area * { /* Added class for general report printing */
     visibility: visible;
   }
-  #invoice-content {
+  #invoice-content, .report-print-area {
     position: absolute;
     left: 0;
     top: 0;
@@ -105,29 +110,37 @@
     border: none;
     box-shadow: none;
   }
-  /* Hide AppShell components */
-  [data-sidebar="sidebar"], /* The sidebar itself */
-  [data-sidebar="trigger"], /* The sidebar trigger button */
-  header.sticky, /* The header within SidebarInset */
+  /* Hide AppShell components and other non-printable elements */
+  [data-sidebar="sidebar"], 
+  [data-sidebar="trigger"], 
+  header.sticky, /* Assuming a sticky header exists */
   .print\:hidden { /* Utility class for elements that should not print */
     display: none !important;
   }
-  main.p-6 { /* Adjust padding of main content area for invoice page */
+  main.p-4, main.p-6 { /* Adjust padding of main content area */
     padding: 0 !important;
+    height: auto !important; /* Allow content to flow for printing */
+    overflow: visible !important;
   }
-  .invoice-page-container { /* Ensure the container itself doesn't constrain width */
+  .container, .invoice-page-container, .report-page-container { /* Ensure containers don't constrain width */
     max-width: none !important;
     padding: 0 !important;
     margin: 0 !important;
   }
-   .invoice-print-area { /* Apply specific padding for print if needed */
+   .invoice-print-area, .report-print-area { /* Apply specific padding for print if needed */
      padding: 20px !important; /* Adjust as necessary */
    }
 
-  /* Override Card styles for printing the invoice */
-  #invoice-content.card, #invoice-content .card {
+  /* Override Card styles for printing the invoice/report */
+  #invoice-content.card, #invoice-content .card,
+  .report-print-area .card {
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
+    background-color: white !important; /* Ensure background is white for printing */
+  }
+   /* Ensure text is black for printing */
+  .report-print-area *, #invoice-content * {
+    color: black !important;
   }
 }

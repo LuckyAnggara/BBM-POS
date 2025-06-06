@@ -15,6 +15,7 @@ import {
   DollarSign, 
   TrendingUp,
   History as HistoryIcon,
+  FileText, // Added for Reports
 } from 'lucide-react';
 
 export interface NavSubItem {
@@ -44,52 +45,57 @@ export const sidebarNavGroups: NavGroup[] = [
     items: [
       {
         label: 'Dashboard', 
-        icon: LayoutDashboard, // Changed from Playground to Dashboard
+        icon: LayoutDashboard, 
         href: '/',
         isActive: (pathname) => pathname === '/',
       },
       {
-        label: 'Inventory', // Changed from Inventory Models
-        icon: Warehouse, // Changed from FolderKanban
+        label: 'Inventory', 
+        icon: Warehouse, 
         isInitiallyOpen: false, 
         subItems: [
           {
             href: '/inventory',
             label: 'All Products',
-            icon: Package, // Consistent icon
+            icon: Package, 
             isActive: (pathname) => pathname === '/inventory' || pathname.startsWith('/inventory/') && !pathname.endsWith('/add') && !pathname.endsWith('/history'),
           },
           {
             href: '/inventory/add',
             label: 'Add New Product',
-            icon: Package, // Consistent icon (or PlusCircle)
+            icon: Package, 
             isActive: (pathname) => pathname === '/inventory/add',
           },
-          // Stock History is usually per product, linked from product detail.
-          // Global stock log could be a report if needed.
         ],
         isActive: (pathname) => pathname.startsWith('/inventory'),
       },
       {
-        label: 'Sales', // Simplified from Sales & Reports
-        icon: DollarSign, // Changed from BarChart3
+        label: 'Sales', 
+        icon: DollarSign, 
         isInitiallyOpen: false,
         subItems: [
           { href: '/sales/history', label: 'Sales History', icon: HistoryIcon },
-          // Future: { href: '/reports/profit-loss', label: 'Profit & Loss', icon: TrendingUp },
         ],
-        isActive: (pathname) => pathname.startsWith('/sales') || pathname.startsWith('/reports'),
+        isActive: (pathname) => pathname.startsWith('/sales'),
+      },
+      {
+        label: 'Reports',
+        icon: BarChart3, // Using BarChart3 for reports group
+        isInitiallyOpen: false,
+        subItems: [
+          { href: '/reports/income-statement', label: 'Income Statement', icon: FileText },
+          // Add more report links here
+        ],
+        isActive: (pathname) => pathname.startsWith('/reports'),
       },
       {
         label: 'System Settings', 
         icon: Settings,
-        href: '/admin/settings', // Points to the specific settings page in admin
+        href: '/admin/settings', 
         isActive: (pathname) => pathname === '/admin/settings',
       },
-      // Removed placeholder "History (General)", "Starred", "Documentation"
     ],
   },
-  // Removed "Projects" group
 ];
 
 export const standaloneNavItems: NavItem[] = [
@@ -110,15 +116,11 @@ export const standaloneNavItems: NavItem[] = [
     icon: SlidersHorizontal,
     isInitiallyOpen: false,
     subItems: [
-      { href: '/admin', label: 'Overview', icon: Home, isActive: (pathname) => pathname === '/admin' && pathname !== '/admin/settings'}, // Ensure settings isn't highlighted
+      { href: '/admin', label: 'Overview', icon: Home, isActive: (pathname) => pathname === '/admin' && pathname !== '/admin/settings'},
       { href: '/admin/users', label: 'Users', icon: Users, isActive: (pathname) => pathname === '/admin/users' },
       { href: '/admin/products', label: 'Product Catalog', icon: Package, isActive: (pathname) => pathname === '/admin/products' },
       { href: '/admin/categories', label: 'Categories', icon: ListTree, isActive: (pathname) => pathname === '/admin/categories' },
-      // System Settings is now a top-level item in "Platform" group.
-      // If it should also appear here, it can be duplicated, or the structure rethought.
-      // For now, keeping it distinct as per user's image where settings is often top-level or clearly separated.
     ],
     isActive: (pathname) => pathname.startsWith('/admin') && pathname !== '/admin/settings',
   },
 ];
-

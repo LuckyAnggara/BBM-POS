@@ -197,3 +197,13 @@ export interface CashTransaction extends Omit<PrismaCashTransaction, 'createdAt'
   createdAt: string;
 }
 
+// Reports Types
+export interface IncomeStatementData {
+  revenue: number;
+  cogs: number;
+  grossProfit: number;
+  // operatingExpenses: number; // Future enhancement
+  netIncome: number;
+  startDate: string;
+  endDate: string;
+}

@@ -10,17 +10,11 @@ import {
   Package,
   Home,
   ListTree,
-  PenTool,
   BarChart3,
-  Plane,
-  MoreHorizontal,
-  Star,
-  History as HistoryIcon, // Renamed to avoid conflict with browser History
-  HelpCircle,
-  FolderKanban,
   SlidersHorizontal,
   DollarSign, 
-  TrendingUp 
+  TrendingUp,
+  History as HistoryIcon,
 } from 'lucide-react';
 
 export interface NavSubItem {
@@ -49,58 +43,53 @@ export const sidebarNavGroups: NavGroup[] = [
     groupTitle: 'Platform',
     items: [
       {
-        label: 'Playground', 
-        icon: LayoutDashboard,
+        label: 'Dashboard', 
+        icon: LayoutDashboard, // Changed from Playground to Dashboard
         href: '/',
         isActive: (pathname) => pathname === '/',
       },
       {
-        label: 'Inventory Models',
-        icon: FolderKanban, 
-        isInitiallyOpen: false, // Keep this closed initially or based on path
+        label: 'Inventory', // Changed from Inventory Models
+        icon: Warehouse, // Changed from FolderKanban
+        isInitiallyOpen: false, 
         subItems: [
           {
             href: '/inventory',
             label: 'All Products',
-            icon: Package,
+            icon: Package, // Consistent icon
+            isActive: (pathname) => pathname === '/inventory' || pathname.startsWith('/inventory/') && !pathname.endsWith('/add') && !pathname.endsWith('/history'),
           },
-          // Example: Adding a sub-item for stock history if needed globally,
-          // but it's usually per product. So, a link on product detail is better.
-          // { href: '/inventory/global-stock-history', label: 'Global Stock Log', icon: HistoryIcon},
+          {
+            href: '/inventory/add',
+            label: 'Add New Product',
+            icon: Package, // Consistent icon (or PlusCircle)
+            isActive: (pathname) => pathname === '/inventory/add',
+          },
+          // Stock History is usually per product, linked from product detail.
+          // Global stock log could be a report if needed.
         ],
-        // This isActive should cover all sub-routes of inventory
         isActive: (pathname) => pathname.startsWith('/inventory'),
       },
       {
-        label: 'Sales & Reports',
-        icon: BarChart3, 
+        label: 'Sales', // Simplified from Sales & Reports
+        icon: DollarSign, // Changed from BarChart3
         isInitiallyOpen: false,
         subItems: [
           { href: '/sales/history', label: 'Sales History', icon: HistoryIcon },
-          // { href: '/reports/profit-loss', label: 'Profit & Loss', icon: TrendingUp },
+          // Future: { href: '/reports/profit-loss', label: 'Profit & Loss', icon: TrendingUp },
         ],
         isActive: (pathname) => pathname.startsWith('/sales') || pathname.startsWith('/reports'),
       },
       {
         label: 'System Settings', 
         icon: Settings,
-        href: '/admin/settings',
+        href: '/admin/settings', // Points to the specific settings page in admin
         isActive: (pathname) => pathname === '/admin/settings',
       },
-      { label: 'History (General)', icon: HistoryIcon, href: '#history-placeholder' },
-      { label: 'Starred', icon: Star, href: '#starred-placeholder' },
-      { label: 'Documentation', icon: HelpCircle, href: '#docs-placeholder' },
+      // Removed placeholder "History (General)", "Starred", "Documentation"
     ],
   },
-  {
-    groupTitle: 'Projects', 
-    items: [
-      { label: 'Design Engineering', icon: PenTool, href: '#design-placeholder' },
-      { label: 'Sales & Marketing', icon: BarChart3, href: '#sales-market-placeholder' },
-      { label: 'Travel', icon: Plane, href: '#travel-placeholder' },
-      { label: 'More', icon: MoreHorizontal, href: '#more-projects-placeholder' },
-    ],
-  },
+  // Removed "Projects" group
 ];
 
 export const standaloneNavItems: NavItem[] = [
@@ -121,11 +110,15 @@ export const standaloneNavItems: NavItem[] = [
     icon: SlidersHorizontal,
     isInitiallyOpen: false,
     subItems: [
-      { href: '/admin', label: 'Overview', icon: Home, isActive: (pathname) => pathname === '/admin' },
+      { href: '/admin', label: 'Overview', icon: Home, isActive: (pathname) => pathname === '/admin' && pathname !== '/admin/settings'}, // Ensure settings isn't highlighted
       { href: '/admin/users', label: 'Users', icon: Users, isActive: (pathname) => pathname === '/admin/users' },
       { href: '/admin/products', label: 'Product Catalog', icon: Package, isActive: (pathname) => pathname === '/admin/products' },
       { href: '/admin/categories', label: 'Categories', icon: ListTree, isActive: (pathname) => pathname === '/admin/categories' },
+      // System Settings is now a top-level item in "Platform" group.
+      // If it should also appear here, it can be duplicated, or the structure rethought.
+      // For now, keeping it distinct as per user's image where settings is often top-level or clearly separated.
     ],
     isActive: (pathname) => pathname.startsWith('/admin') && pathname !== '/admin/settings',
   },
 ];
+

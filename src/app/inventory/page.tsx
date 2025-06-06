@@ -38,10 +38,10 @@ const ProductCardItem = ({ product, onDeleteClick }: { product: Product; onDelet
           data-ai-hint="product image"
         />
       </Link>
-      <CardTitle className="text-lg font-headline">
+      <CardTitle className="text-lg font-headline truncate" title={product.name}>
          <Link href={`/inventory/${product.id}`} className="hover:underline">{product.name}</Link>
       </CardTitle>
-      <CardDescription>{product.category?.name || 'Uncategorized'} - SKU: {product.sku}</CardDescription>
+      <CardDescription className="text-xs truncate">{product.category?.name || 'Uncategorized'} - SKU: {product.sku}</CardDescription>
     </CardHeader>
     <CardContent className="p-4 flex-grow">
       <div className="flex justify-between items-center text-sm mb-1">
@@ -55,14 +55,14 @@ const ProductCardItem = ({ product, onDeleteClick }: { product: Product; onDelet
         </Badge>
       </div>
     </CardContent>
-    <CardFooter className="p-4 border-t gap-2">
-      <Link href={`/inventory/${product.id}`} className="w-full" passHref>
-        <Button variant="outline" size="sm" className="w-full">
-          <Eye className="mr-2 h-4 w-4" /> View Details
+    <CardFooter className="p-3 border-t flex justify-end gap-2">
+      <Link href={`/inventory/${product.id}`} passHref>
+        <Button variant="outline" size="icon" aria-label="View Details">
+          <Eye className="h-4 w-4" />
         </Button>
       </Link>
-      <Button variant="destructive" size="sm" className="w-full" onClick={() => onDeleteClick(product.id)}>
-        <Trash2 className="mr-2 h-4 w-4" /> Delete
+      <Button variant="destructive" size="icon" aria-label="Delete Product" onClick={() => onDeleteClick(product.id)}>
+        <Trash2 className="h-4 w-4" />
       </Button>
     </CardFooter>
   </Card>

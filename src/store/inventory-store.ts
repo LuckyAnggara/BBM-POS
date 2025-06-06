@@ -31,7 +31,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   fetchProducts: async () => {
     set({ isLoading: true, error: null });
     try {
-      const appProducts = await fetchAllProductsAction();
+      const appProducts = await fetchAllProductsAction(true);
       set({ products: appProducts, isLoading: false });
     } catch (err) {
       console.error("Failed to fetch products:", err);

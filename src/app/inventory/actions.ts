@@ -38,19 +38,28 @@ const mapPrismaCategoryToAppCategory = (dbCategory: any): Category => {
 
 
 export async function fetchAllProductsAction(includeCategory: boolean = true): Promise<Product[]> {
-  try {
-    const dbProducts = await prisma.product.findMany({
-      orderBy: { name: 'asc' },
-      include: {
-        category: includeCategory, // Include category data based on parameter
-      },
-    });
-    console.log('Product', dbProducts)
-    return dbProducts.map(mapPrismaProductToAppProduct);
-  } catch (error) {
-    console.error('Failed to fetch products action:', error);
-    throw new Error('Could not fetch products.');
-  }
+  console.log('sukses')
+
+  const dbProducts = await prisma.product.findMany({
+    include: { category: true,  },
+  });
+  console.log(JSON.stringify(dbProducts, null, 2)); 
+  return dbProducts.map(mapPrismaProductToAppProduct);
+  // try {
+  //   const dbProducts = await prisma.product.findMany({
+  //     include: {
+  //       category: includeCategory, // Include category data based on 
+  //     },
+  //   });
+  //   console.log('Product', dbProducts)
+  //   return dbProducts.map(mapPrismaProductToAppProduct);
+  // }  catch (error) {
+  //   console.error('Failed to fetch products action:', error);
+  //   if (error instanceof Error) {
+  //     console.error('Stack trace:', error.stack);
+  //   }
+  //   throw new Error('Could not fetch products.');
+  // }
 }
 
 export async function createProductAction(productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'category'>): Promise<Product> {

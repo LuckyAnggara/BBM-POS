@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye, Search, Filter, Download, History, FileText, DollarSign, Users, ShoppingBag } from "lucide-react";
+import { Eye, Search, Filter, Download, History, FileText, DollarSign, Users, ShoppingBag, FileSpreadsheet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from '@/components/ui/input';
 import {
@@ -24,8 +24,8 @@ import Link from 'next/link';
 const paymentMethodColors: Record<string, string> = {
   'Cash': 'bg-green-100 text-green-800 border-green-300',
   'Credit Card': 'bg-blue-100 text-blue-800 border-blue-300',
-  'VISA': 'bg-sky-100 text-sky-800 border-sky-300', // Generic for VISA
-  'Mastercard': 'bg-orange-100 text-orange-800 border-orange-300', // Generic for Mastercard
+  'VISA': 'bg-sky-100 text-sky-800 border-sky-300',
+  'Mastercard': 'bg-orange-100 text-orange-800 border-orange-300',
   // Add more as needed
 };
 
@@ -155,9 +155,7 @@ export default function SalesHistoryPage() {
                 {filteredSales.map((sale) => (
                   <TableRow key={sale.id}>
                     <TableCell className="font-medium">
-                      {/* <Link href={`/sales/${sale.id}`} className="hover:underline"> */}
                         {sale.saleNumber}
-                      {/* </Link> */}
                     </TableCell>
                     <TableCell className="text-xs">{format(parseISO(sale.saleDate), 'MMM dd, yyyy HH:mm')}</TableCell>
                     <TableCell className="text-xs">{sale.customerName || sale.customer?.name || 'Guest'}</TableCell>
@@ -181,19 +179,12 @@ export default function SalesHistoryPage() {
                     </TableCell>
                     <TableCell className="text-right font-semibold text-xs">${sale.grandTotal.toFixed(2)}</TableCell>
                     <TableCell className="text-center">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => toast.info("View Sale Details: Not yet implemented.")}>
-                            <FileText className="mr-2 h-4 w-4" /> View Details
-                          </DropdownMenuItem>
-                           {/* Add more actions like Print Receipt, Refund (later) */}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                       <Button variant="ghost" size="icon" asChild className="h-8 w-8">
+                         <Link href={`/sales/invoice/${sale.id}`}>
+                           <FileSpreadsheet className="h-4 w-4" />
+                           <span className="sr-only">View Invoice</span>
+                         </Link>
+                       </Button>
                     </TableCell>
                   </TableRow>
                 ))}

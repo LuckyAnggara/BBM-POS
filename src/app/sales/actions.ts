@@ -2,7 +2,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import type { Sale, Customer, User } from '@/lib/types';
+import type { Sale, Customer, User, Product, Category } from '@/lib/types';
 
 // Helper to map Prisma User to App User type
 const mapPrismaUserToAppUser = (prismaUser: any): User | undefined => {
@@ -26,6 +26,32 @@ const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer | null => {
   };
 };
 
+const mapPrismaProductToAppProductLocal = (prismaProduct: any): Product => {
+  if (!prismaProduct) return undefined as unknown as Product;
+  return {
+    id: prismaProduct.id,
+    name: prismaProduct.name,
+    sku: prismaProduct.sku,
+    quantity: prismaProduct.quantity,
+    price: prismaProduct.price ? prismaProduct.price.toNumber() : 0,
+    costPrice: prismaProduct.costPrice ? prismaProduct.costPrice.toNumber() : null,
+    supplier: prismaProduct.supplier ?? undefined,
+    description: prismaProduct.description ?? undefined,
+    imageUrl: prismaProduct.imageUrl ?? undefined,
+    lowStockThreshold: prismaProduct.lowStockThreshold ?? undefined,
+    tags: prismaProduct.tags ? JSON.parse(prismaProduct.tags as string) : [],
+    categoryId: prismaProduct.categoryId,
+    category: prismaProduct.category ? {
+        id: prismaProduct.category.id,
+        name: prismaProduct.category.name,
+        createdAt: prismaProduct.category.createdAt.toISOString(),
+        updatedAt: prismaProduct.category.updatedAt.toISOString(),
+    } : null,
+    createdAt: prismaProduct.createdAt.toISOString(),
+    updatedAt: prismaProduct.updatedAt.toISOString(),
+  };
+};
+
 // Helper to map Prisma Sale to App Sale
 const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
   return {
@@ -35,12 +61,12 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
     customerId: dbSale.customerId,
     customerName: dbSale.customerName,
     userId: dbSale.userId,
-    subtotal: parseFloat(dbSale.subtotal),
-    discountAmount: parseFloat(dbSale.discountAmount),
-    taxPercent: parseFloat(dbSale.taxPercent),
-    taxAmount: parseFloat(dbSale.taxAmount),
-    shippingCost: parseFloat(dbSale.shippingCost),
-    grandTotal: parseFloat(dbSale.grandTotal),
+    subtotal: dbSale.subtotal.toNumber(),
+    discountAmount: dbSale.discountAmount.toNumber(),
+    taxPercent: dbSale.taxPercent.toNumber(),
+    taxAmount: dbSale.taxAmount.toNumber(),
+    shippingCost: dbSale.shippingCost.toNumber(),
+    grandTotal: dbSale.grandTotal.toNumber(),
     paymentMethod: dbSale.paymentMethod,
     status: dbSale.status,
     notes: dbSale.notes,
@@ -52,13 +78,12 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
       productId: item.productId,
       productName: item.productName,
       quantity: item.quantity,
-      unitPrice: parseFloat(item.unitPrice),
-      totalPrice: parseFloat(item.totalPrice),
-      costPriceAtSale: item.costPriceAtSale !== null ? parseFloat(item.costPriceAtSale) : null,
+      unitPrice: item.unitPrice.toNumber(),
+      totalPrice: item.totalPrice.toNumber(),
+      costPriceAtSale: item.costPriceAtSale !== null ? item.costPriceAtSale.toNumber() : null,
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString(),
-      // Product relation can be optionally included if needed for display here
-      // product: item.product ? { ...item.product, price: parseFloat(item.product.price), costPrice: item.product.costPrice !== null ? parseFloat(item.product.costPrice) : null } : undefined,
+      product: item.product ? mapPrismaProductToAppProductLocal(item.product) : undefined,
     })),
     customer: mapPrismaCustomerToAppCustomer(dbSale.customer),
     user: mapPrismaUserToAppUser(dbSale.user),
@@ -69,9 +94,9 @@ export async function fetchSalesHistory(): Promise<Sale[]> {
   try {
     const dbSales = await prisma.sale.findMany({
       include: {
-        items: true, // Include sale items
-        customer: true, // Include customer details
-        user: true, // Include user (cashier) details
+        items: { include: { product: { include: { category: true } } } },
+        customer: true,
+        user: true,
       },
       orderBy: {
         saleDate: 'desc',
@@ -81,5 +106,27 @@ export async function fetchSalesHistory(): Promise<Sale[]> {
   } catch (error) {
     console.error('Failed to fetch sales history:', error);
     throw new Error('Could not fetch sales history.');
+  }
+}
+
+export async function fetchSaleById(saleId: string): Promise<Sale | null> {
+  try {
+    const dbSale = await prisma.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        items: { 
+          include: { 
+            product: { include: { category: true } } // Include product details for each item
+          } 
+        },
+        customer: true,
+        user: true,
+      },
+    });
+    if (!dbSale) return null;
+    return mapPrismaSaleToAppSale(dbSale);
+  } catch (error) {
+    console.error(`Failed to fetch sale with ID ${saleId}:`, error);
+    throw new Error('Could not fetch sale details.');
   }
 }

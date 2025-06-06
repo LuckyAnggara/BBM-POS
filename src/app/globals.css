@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -84,5 +85,49 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #invoice-content, #invoice-content * {
+    visibility: visible;
+  }
+  #invoice-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+  }
+  /* Hide AppShell components */
+  [data-sidebar="sidebar"], /* The sidebar itself */
+  [data-sidebar="trigger"], /* The sidebar trigger button */
+  header.sticky, /* The header within SidebarInset */
+  .print\:hidden { /* Utility class for elements that should not print */
+    display: none !important;
+  }
+  main.p-6 { /* Adjust padding of main content area for invoice page */
+    padding: 0 !important;
+  }
+  .invoice-page-container { /* Ensure the container itself doesn't constrain width */
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+   .invoice-print-area { /* Apply specific padding for print if needed */
+     padding: 20px !important; /* Adjust as necessary */
+   }
+
+  /* Override Card styles for printing the invoice */
+  #invoice-content.card, #invoice-content .card {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
   }
 }

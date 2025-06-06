@@ -90,9 +90,35 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
   };
 };
 
-export async function fetchSalesHistory(): Promise<Sale[]> {
+export interface SalesHistoryFilters {
+  startDate?: string; // ISO date string
+  endDate?: string;   // ISO date string
+  status?: string;
+  paymentMethod?: string;
+}
+
+export async function fetchSalesHistory(filters?: SalesHistoryFilters): Promise<Sale[]> {
   try {
+    const whereClause: any = {};
+
+    if (filters?.startDate) {
+      whereClause.saleDate = { ...whereClause.saleDate, gte: new Date(filters.startDate) };
+    }
+    if (filters?.endDate) {
+      const endDateObj = new Date(filters.endDate);
+      // Set to end of the selected day for inclusive filtering
+      endDateObj.setHours(23, 59, 59, 999);
+      whereClause.saleDate = { ...whereClause.saleDate, lte: endDateObj };
+    }
+    if (filters?.status && filters.status !== 'All Statuses') {
+      whereClause.status = filters.status;
+    }
+    if (filters?.paymentMethod && filters.paymentMethod !== 'All Methods') {
+      whereClause.paymentMethod = filters.paymentMethod;
+    }
+
     const dbSales = await prisma.sale.findMany({
+      where: whereClause,
       include: {
         items: { include: { product: { include: { category: true } } } },
         customer: true,

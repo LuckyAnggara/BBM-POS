@@ -1,32 +1,53 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye, Search, Filter, Download, History, FileText, DollarSign, Users, ShoppingBag, FileSpreadsheet } from "lucide-react";
+import { Eye, Search, Filter, Download, History, FileText, DollarSign, Users, ShoppingBag, FileSpreadsheet, CalendarIcon, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from '@/components/ui/input';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetClose,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Sale } from '@/lib/types';
-import { fetchSalesHistory } from '../actions';
+import { fetchSalesHistory, type SalesHistoryFilters } from '../actions';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
+
+const paymentMethodOptions = ['All Methods', 'Cash', 'Credit Card', 'VISA', 'Mastercard']; // Add more as needed
+const saleStatusOptions = ['All Statuses', 'Completed', 'PendingPayment', 'Refunded', 'Cancelled'];
 
 const paymentMethodColors: Record<string, string> = {
   'Cash': 'bg-green-100 text-green-800 border-green-300',
   'Credit Card': 'bg-blue-100 text-blue-800 border-blue-300',
   'VISA': 'bg-sky-100 text-sky-800 border-sky-300',
   'Mastercard': 'bg-orange-100 text-orange-800 border-orange-300',
-  // Add more as needed
 };
 
 const saleStatusColors: Record<string, string> = {
@@ -41,29 +62,70 @@ export default function SalesHistoryPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+  const [filters, setFilters] = useState<SalesHistoryFilters>({
+    startDate: undefined,
+    endDate: undefined,
+    status: 'All Statuses',
+    paymentMethod: 'All Methods',
+  });
+  const [tempFilters, setTempFilters] = useState<SalesHistoryFilters>(filters);
+
+
+  const loadSales = useCallback(async (currentFilters?: SalesHistoryFilters) => {
+    setIsLoading(true);
+    try {
+      const fetchedSales = await fetchSalesHistory(currentFilters);
+      setSales(fetchedSales);
+    } catch (error) {
+      toast.error("Failed to load sales history.");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function loadSales() {
-      setIsLoading(true);
-      try {
-        const fetchedSales = await fetchSalesHistory();
-        setSales(fetchedSales);
-      } catch (error) {
-        toast.error("Failed to load sales history.");
-        console.error(error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadSales();
-  }, []);
+    loadSales(filters);
+  }, [loadSales, filters]); 
+  
+  // Update tempFilters when main filters change (e.g. on clear)
+  useEffect(() => {
+    setTempFilters(filters);
+  }, [filters]);
+
+
+  const handleApplyFilters = () => {
+    setFilters(tempFilters);
+    setIsSheetOpen(false);
+  };
+
+  const handleClearFilters = () => {
+    const cleared = {
+        startDate: undefined,
+        endDate: undefined,
+        status: 'All Statuses',
+        paymentMethod: 'All Methods',
+    };
+    setTempFilters(cleared);
+    setFilters(cleared); // Apply cleared filters immediately
+    setIsSheetOpen(false);
+  };
+  
+  const activeFilterCount = () => {
+    let count = 0;
+    if (filters.startDate) count++;
+    if (filters.endDate) count++;
+    if (filters.status && filters.status !== 'All Statuses') count++;
+    if (filters.paymentMethod && filters.paymentMethod !== 'All Methods') count++;
+    return count;
+  };
 
   const filteredSales = sales.filter(sale =>
     sale.saleNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (sale.customerName && sale.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (sale.user?.name && sale.user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (sale.paymentMethod && sale.paymentMethod.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    sale.status.toLowerCase().includes(searchTerm.toLowerCase())
+    (sale.user?.name && sale.user.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -87,15 +149,117 @@ export default function SalesHistoryPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search by Sale No, Customer, Cashier, Payment, Status..."
+                placeholder="Search by Sale No, Customer, Cashier..."
                 className="w-full rounded-lg bg-background pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button variant="outline" disabled>
-              <Filter className="mr-2 h-4 w-4" /> Filter by Date/Status
-            </Button>
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="relative">
+                  <Filter className="mr-2 h-4 w-4" /> Filter Sales
+                  {activeFilterCount() > 0 && (
+                    <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-xs rounded-full">
+                      {activeFilterCount()}
+                    </Badge>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Filter Sales History</SheetTitle>
+                  <SheetDescription>
+                    Refine your sales view by date, status, or payment method.
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="startDate">Start Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            id="startDate"
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !tempFilters.startDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {tempFilters.startDate ? format(new Date(tempFilters.startDate), "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={tempFilters.startDate ? new Date(tempFilters.startDate) : undefined}
+                            onSelect={(date) => setTempFilters(prev => ({...prev, startDate: date ? date.toISOString() : undefined}))}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="endDate">End Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            id="endDate"
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !tempFilters.endDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {tempFilters.endDate ? format(new Date(tempFilters.endDate), "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={tempFilters.endDate ? new Date(tempFilters.endDate) : undefined}
+                            onSelect={(date) => setTempFilters(prev => ({...prev, endDate: date ? date.toISOString() : undefined}))}
+                            disabled={(date) => tempFilters.startDate ? date < new Date(tempFilters.startDate) : false}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="status">Status</Label>
+                    <Select value={tempFilters.status} onValueChange={(value) => setTempFilters(prev => ({...prev, status: value}))}>
+                      <SelectTrigger id="status">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {saleStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="paymentMethod">Payment Method</Label>
+                    <Select value={tempFilters.paymentMethod} onValueChange={(value) => setTempFilters(prev => ({...prev, paymentMethod: value}))}>
+                      <SelectTrigger id="paymentMethod">
+                        <SelectValue placeholder="Select payment method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {paymentMethodOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <SheetFooter>
+                  <Button variant="outline" onClick={handleClearFilters}>Clear Filters</Button>
+                  <SheetClose asChild>
+                    <Button onClick={handleApplyFilters}>Apply Filters</Button>
+                  </SheetClose>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
           </div>
         </CardHeader>
         <CardContent>
@@ -133,8 +297,8 @@ export default function SalesHistoryPage() {
           ) : filteredSales.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-lg text-muted-foreground">No sales transactions found.</p>
-              <p className="text-sm text-muted-foreground">Once sales are made, they will appear here.</p>
+              <p className="text-lg text-muted-foreground">No sales transactions match your criteria.</p>
+              <p className="text-sm text-muted-foreground">Try adjusting your filters or search term.</p>
             </div>
           ) : (
             <Table>

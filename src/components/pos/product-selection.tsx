@@ -33,7 +33,7 @@ export function ProductSelection() {
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
     product.quantity > 0 &&
-    (activeCategory === "All Product" || product.category.toLowerCase() === activeCategory.toLowerCase())
+    (activeCategory === "All Product" || product.category?.name?.toLowerCase() === activeCategory.toLowerCase())
   );
 
   const ProductItemCard = ({ product }: { product: Product }) => (
@@ -50,7 +50,7 @@ export function ProductSelection() {
       <CardContent className="p-3 flex-grow flex flex-col justify-between">
         <div>
           <h3 className="text-base font-semibold truncate font-headline" title={product.name}>{product.name}</h3>
-          <p className="text-xs text-muted-foreground mb-2">{product.category || "General"}</p>
+          <p className="text-xs text-muted-foreground mb-2">{product.category?.name || "General"}</p>
           
           {/* Size Selection - Visual Placeholder */}
           <div className="mb-2">

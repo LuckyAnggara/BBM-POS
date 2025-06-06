@@ -7,6 +7,9 @@ async function main() {
   console.log(`Start seeding ...`);
 
   // Clear existing data in reverse order of dependency
+  await prisma.saleItem.deleteMany();
+  await prisma.sale.deleteMany();
+  await prisma.customer.deleteMany();
   await prisma.appSettings.deleteMany(); 
   await prisma.purchaseOrderItem.deleteMany();
   await prisma.purchaseOrder.deleteMany();
@@ -65,7 +68,7 @@ async function main() {
       id: 'user_manager_bob', name: 'Bob The Builder', email: 'bob@stockpilot.com', role: "MANAGER", avatarUrl: 'https://placehold.co/100x100/FFC107/000000.png?text=BB', isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
     },
     {
-      id: 'user_staff_charlie', name: 'Charlie Brown', email: 'charlie@stockpilot.com', role: "STAFF", avatarUrl: 'https://placehold.co/100x100/4CAF50/FFFFFF.png?text=CB', isActive: false,
+      id: 'user_staff_charlie', name: 'Charlie Brown', email: 'charlie@stockpilot.com', role: "STAFF", avatarUrl: 'https://placehold.co/100x100/4CAF50/FFFFFF.png?text=CB', isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 3), // Make Charlie active
     },
     {
       id: 'user_staff_diana', name: 'Diana Prince', email: 'diana@stockpilot.com', role: "STAFF", isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 30),
@@ -79,70 +82,82 @@ async function main() {
     console.log(`Created user with id: ${user.id} (${user.name})`);
   }
 
+  // Seed Customers
+  const customersToCreate = [
+    { id: 'cust_john_doe', name: 'John Doe', email: 'john.doe@example.com', phone: '555-0101' },
+    { id: 'cust_jane_smith', name: 'Jane Smith', email: 'jane.smith@example.com', phone: '555-0102' },
+    { id: 'cust_guest_1', name: 'Guest Customer', email: null, phone: null }, // Example guest
+  ];
+  for (const c of customersToCreate) {
+    const customer = await prisma.customer.create({ data: c });
+    console.log(`Created customer with id: ${customer.id} (${customer.name})`);
+  }
+
+
   // Seed Purchase Orders
   if (createdProducts.length > 0 && createdUsers.length > 0) {
     const adminUser = createdUsers.find(u => u.role === "ADMIN");
     if (!adminUser) {
         console.error("Admin user not found for seeding POs. Skipping PO seeding.");
-        return;
+    } else {
+        const po1 = await prisma.purchaseOrder.create({
+        data: {
+            poNumber: 'PO2024-001-DB',
+            supplierName: 'Fresh Farms Inc.',
+            orderDate: new Date('2024-07-15T10:00:00Z'),
+            expectedDeliveryDate: new Date('2024-07-20T10:00:00Z'),
+            status: "Received", 
+            discountAmount: 0,
+            shippingCost: 10.00,
+            taxes: 5.00,
+            totalAmount: 90.00, 
+            notes: 'Ensure apples are fresh upon delivery.',
+            createdById: adminUser.id,
+            items: {
+            create: [
+                {
+                productId: createdProducts[0].id, 
+                productName: createdProducts[0].name,
+                quantityOrdered: 50,
+                quantityReceived: 50,
+                unitCost: createdProducts[0].costPrice || 1.50,
+                totalCost: (createdProducts[0].costPrice || 1.50) * 50,
+                },
+            ],
+            },
+        },
+        });
+        console.log(`Created PO with id: ${po1.id}`);
+
+        const po2 = await prisma.purchaseOrder.create({
+        data: {
+            poNumber: 'PO2024-002-DB',
+            supplierName: 'Artisan Bakers Co.',
+            orderDate: new Date('2024-07-18T11:00:00Z'),
+            expectedDeliveryDate: new Date('2024-07-25T11:00:00Z'),
+            status: "Ordered", 
+            discountAmount: 5.00,
+            shippingCost: 5.00,
+            taxes: 0.00,
+            totalAmount: 66.00, 
+            createdById: adminUser.id,
+            items: {
+            create: [
+                {
+                productId: createdProducts[1].id, 
+                productName: createdProducts[1].name,
+                quantityOrdered: 30,
+                unitCost: createdProducts[1].costPrice || 2.20,
+                totalCost: (createdProducts[1].costPrice || 2.20) * 30,
+                },
+            ],
+            },
+        },
+        });
+        console.log(`Created PO with id: ${po2.id}`);
     }
-
-    const po1 = await prisma.purchaseOrder.create({
-      data: {
-        poNumber: 'PO2024-001-DB',
-        supplierName: 'Fresh Farms Inc.',
-        orderDate: new Date('2024-07-15T10:00:00Z'),
-        expectedDeliveryDate: new Date('2024-07-20T10:00:00Z'),
-        status: "Received", // String value
-        discountAmount: 0,
-        shippingCost: 10.00,
-        taxes: 5.00,
-        totalAmount: 90.00, 
-        notes: 'Ensure apples are fresh upon delivery.',
-        createdById: adminUser.id,
-        items: {
-          create: [
-            {
-              productId: createdProducts[0].id, 
-              productName: createdProducts[0].name,
-              quantityOrdered: 50,
-              quantityReceived: 50,
-              unitCost: createdProducts[0].costPrice || 1.50,
-              totalCost: (createdProducts[0].costPrice || 1.50) * 50,
-            },
-          ],
-        },
-      },
-    });
-    console.log(`Created PO with id: ${po1.id}`);
-
-    const po2 = await prisma.purchaseOrder.create({
-      data: {
-        poNumber: 'PO2024-002-DB',
-        supplierName: 'Artisan Bakers Co.',
-        orderDate: new Date('2024-07-18T11:00:00Z'),
-        expectedDeliveryDate: new Date('2024-07-25T11:00:00Z'),
-        status: "Ordered", // String value
-        discountAmount: 5.00,
-        shippingCost: 5.00,
-        taxes: 0.00,
-        totalAmount: 66.00, 
-        createdById: adminUser.id,
-        items: {
-          create: [
-            {
-              productId: createdProducts[1].id, 
-              productName: createdProducts[1].name,
-              quantityOrdered: 30,
-              unitCost: createdProducts[1].costPrice || 2.20,
-              totalCost: (createdProducts[1].costPrice || 2.20) * 30,
-            },
-          ],
-        },
-      },
-    });
-    console.log(`Created PO with id: ${po2.id}`);
   }
+  // Sales will be created via app usage
 
   console.log(`Seeding finished.`);
 }

@@ -1,5 +1,5 @@
 
-import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, AppSettings as PrismaAppSettings } from '@prisma/client';
+import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, AppSettings as PrismaAppSettings, Customer as PrismaCustomer, Sale as PrismaSale, SaleItem as PrismaSaleItem } from '@prisma/client';
 
 export interface Product {
   id: string;
@@ -26,7 +26,6 @@ export interface CartItem {
   imageUrl?: string | null;
 }
 
-// PurchaseOrderStatus is now a string type. Validation will rely on purchaseOrderStatusOptions.
 export type PurchaseOrderStatus = string;
 
 export interface PurchaseOrderItem {
@@ -36,19 +35,19 @@ export interface PurchaseOrderItem {
   quantityOrdered: number;
   quantityReceived?: number | null;
   unitCost: number;
-  totalCost: number; // Calculated: quantityOrdered * unitCost
-  product?: Product; // Optional: for displaying product details if needed
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  totalCost: number; 
+  product?: Product; 
+  createdAt: string; 
+  updatedAt: string; 
 }
 
 export interface PurchaseOrder {
   id: string;
   poNumber: string;
   supplierName: string;
-  orderDate: string; // ISO date string
-  expectedDeliveryDate?: string | null; // ISO date string
-  status: PurchaseOrderStatus; // Now string
+  orderDate: string; 
+  expectedDeliveryDate?: string | null; 
+  status: PurchaseOrderStatus; 
   items: PurchaseOrderItem[];
   discountAmount?: number | null;
   shippingCost?: number | null;
@@ -56,24 +55,23 @@ export interface PurchaseOrder {
   totalAmount: number;
   notes?: string | null;
   createdById: string;
-  createdBy?: User; // For displaying user info
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  createdBy?: User; 
+  createdAt: string; 
+  updatedAt: string; 
 }
 
-// UserRole is now a string type.
 export type UserRole = string;
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole; // Now string
+  role: UserRole; 
   avatarUrl?: string | null;
   isActive: boolean;
-  lastLogin?: string | null; // ISO date string or null
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  lastLogin?: string | null; 
+  createdAt: string; 
+  updatedAt: string; 
 }
 
 export interface Supplier {
@@ -89,6 +87,36 @@ export interface Supplier {
 }
 
 export interface AppSettings extends Omit<PrismaAppSettings, 'createdAt' | 'updatedAt'> {
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  createdAt: string; 
+  updatedAt: string; 
 }
+
+// POS and Sales Related Types
+export interface Customer extends Omit<PrismaCustomer, 'createdAt' | 'updatedAt'> {
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaleItem extends Omit<PrismaSaleItem, 'createdAt' | 'updatedAt' | 'sale' | 'product'> {
+  product?: Product; // For potential display purposes, though productId is the FK
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Sale extends Omit<PrismaSale, 'createdAt' | 'updatedAt' | 'saleDate' | 'customer' | 'user' | 'items'> {
+  saleDate: string; // ISO date string
+  customer?: Customer | null;
+  user?: User; // Cashier/Seller
+  items: SaleItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// For creating a sale
+export type SaleItemDataForCreation = Omit<SaleItem, 'id' | 'createdAt' | 'updatedAt' | 'saleId'>;
+
+export type SaleDataForCreation = Omit<Sale, 'id' | 'saleNumber' | 'createdAt' | 'updatedAt' | 'items' | 'user' | 'customer' | 'saleDate'> & {
+  customerId?: string; // Will pass customerId directly
+  userId: string; // Will pass userId directly
+  cartItems: CartItem[]; // For easier processing of cart items into SaleItemDataForCreation
+};

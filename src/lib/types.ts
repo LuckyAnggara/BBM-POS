@@ -87,6 +87,7 @@ export interface Supplier {
 }
 
 export interface AppSettings extends Omit<PrismaAppSettings, 'createdAt' | 'updatedAt'> {
+  defaultTaxRate: number;
   createdAt: string; 
   updatedAt: string; 
 }

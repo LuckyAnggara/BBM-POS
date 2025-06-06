@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS_ID = 'main_settings';
 const mapPrismaSettingsToAppSettings = (prismaSettings: any): AppSettings => {
   return {
     ...prismaSettings,
+    defaultTaxRate: prismaSettings.defaultTaxRate ?? 0, // Ensure defaultTaxRate is a number
     createdAt: prismaSettings.createdAt.toISOString(),
     updatedAt: prismaSettings.updatedAt.toISOString(),
   };
@@ -28,7 +29,6 @@ export async function fetchAppSettings(): Promise<AppSettings> {
       settings = await prisma.appSettings.create({
         data: {
           id: DEFAULT_SETTINGS_ID,
-          // Default values are set in schema, but can be overridden here if needed
           appName: 'StockPilot',
           dateFormat: 'MM/dd/yyyy',
           timeZone: 'America/New_York',
@@ -36,6 +36,7 @@ export async function fetchAppSettings(): Promise<AppSettings> {
           emailNotifications: true,
           lowStockAlerts: true,
           newOrderAlerts: false,
+          defaultTaxRate: 0, // Default to 0% tax
         },
       });
       console.log('Default app settings created.');
@@ -52,9 +53,14 @@ export async function saveAppSettings(data: Partial<Omit<AppSettings, 'id' | 'cr
   try {
     const updatedSettings = await prisma.appSettings.update({
       where: { id: DEFAULT_SETTINGS_ID },
-      data: data,
+      data: {
+        ...data,
+        defaultTaxRate: data.defaultTaxRate !== undefined ? Number(data.defaultTaxRate) : undefined,
+      }
     });
     revalidatePath('/admin/settings');
+    // Potentially revalidate other paths if settings affect them, e.g., POS if tax rate changes
+    revalidatePath('/pos');
     return mapPrismaSettingsToAppSettings(updatedSettings);
   } catch (error) {
     console.error('Failed to save app settings:', error);

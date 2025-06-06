@@ -43,6 +43,7 @@ export async function createProductAction(productData: Omit<Product, 'id' | 'cre
     });
     revalidatePath('/inventory');
     revalidatePath('/admin/products');
+    revalidatePath('/pos'); // Product list in POS might change
     return mapPrismaProductToAppProduct(newDbProduct);
   } catch (error) {
     console.error('Failed to create product action:', error);
@@ -66,6 +67,7 @@ export async function updateProductAction(productId: string, updatedProductData:
     revalidatePath(`/inventory/${productId}`);
     revalidatePath(`/inventory/${productId}/edit`);
     revalidatePath('/admin/products');
+    revalidatePath('/pos');
     return mapPrismaProductToAppProduct(updatedDbProduct);
   } catch (error) {
     console.error('Failed to update product action:', error);
@@ -80,6 +82,7 @@ export async function deleteProductAction(productId: string): Promise<void> {
     });
     revalidatePath('/inventory');
     revalidatePath('/admin/products');
+    revalidatePath('/pos');
   } catch (error) {
     console.error('Failed to delete product action:', error);
     throw new Error('Could not delete product.');
@@ -100,6 +103,7 @@ export async function decreaseProductStockAction(productId: string, quantityToDe
     revalidatePath('/inventory');
     revalidatePath(`/inventory/${productId}`);
     revalidatePath('/pos'); // Revalidate POS page as stock changes
+    revalidatePath('/admin/products'); // Admin product list also shows stock
     return mapPrismaProductToAppProduct(updatedDbProduct);
   } catch (error) {
     console.error('Failed to decrease product stock action:', error);
@@ -121,9 +125,35 @@ export async function increaseProductStockAction(productId: string, quantityToIn
     revalidatePath('/inventory');
     revalidatePath(`/inventory/${productId}`);
     revalidatePath('/purchasing'); // Revalidate purchasing page as stock changes
+    revalidatePath('/admin/products');
     return mapPrismaProductToAppProduct(updatedDbProduct);
   } catch (error) {
     console.error('Failed to increase product stock action:', error);
     throw new Error('Could not increase product stock.');
+  }
+}
+
+export async function fetchDistinctProductCategories(): Promise<string[]> {
+  try {
+    const categories = await prisma.product.findMany({
+      select: {
+        category: true,
+      },
+      distinct: ['category'],
+      orderBy: {
+        category: 'asc',
+      },
+      where: {
+        category: {
+          not: null, // Ensure category is not null
+          notIn: [''], // Ensure category is not an empty string
+        }
+      }
+    });
+    // Filter out null or empty string categories that might still slip through some DBs, though `notIn: ['']` should help
+    return categories.map(c => c.category).filter(c => c && c.trim() !== "");
+  } catch (error) {
+    console.error('Failed to fetch product categories:', error);
+    return []; // Return empty array on error
   }
 }

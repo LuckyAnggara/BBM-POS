@@ -19,7 +19,9 @@ async function main() {
   // Seed AppSettings (ensure only one record)
   await prisma.appSettings.upsert({
     where: { id: 'main_settings' },
-    update: {}, 
+    update: {
+      defaultTaxRate: 10, // Set default tax rate if updating
+    }, 
     create: {
       id: 'main_settings', 
       appName: "StockPilot HQ",
@@ -29,6 +31,7 @@ async function main() {
       emailNotifications: true,
       lowStockAlerts: true,
       newOrderAlerts: true,
+      defaultTaxRate: 10, // e.g. 10%
     },
   });
   console.log(`Created/ensured main app settings.`);
@@ -49,6 +52,15 @@ async function main() {
     },
     {
       id: 'prod_oil', name: 'Extra Virgin Olive Oil', sku: 'OIL-EVO-005', category: 'Pantry Staples', quantity: 80, price: 9.75, costPrice: 5.25, supplier: 'Mediterranean Groves', description: 'Cold-pressed extra virgin olive oil, 500ml.', imageUrl: 'https://placehold.co/300x200/808000/ffffff.png?text=Oil', tags: JSON.stringify(['oil', 'pantry', 'cooking']), lowStockThreshold: 10,
+    },
+    {
+      id: 'prod_shirt_men', name: 'Men\'s Classic Tee', sku: 'MEN-TEE-001', category: 'Men', quantity: 120, price: 25.00, costPrice: 10.00, supplier: 'Apparel Co.', description: 'Comfortable and stylish classic t-shirt for men.', imageUrl: 'https://placehold.co/300x200/5c677d/ffffff.png?text=Men+Tee', tags: JSON.stringify(['clothing', 'men', 'tshirt']), lowStockThreshold: 15,
+    },
+    {
+      id: 'prod_dress_women', name: 'Women\'s Summer Dress', sku: 'WOM-DRS-001', category: 'Women', quantity: 80, price: 45.00, costPrice: 18.00, supplier: 'Fashionista Ltd.', description: 'Light and airy summer dress for women.', imageUrl: 'https://placehold.co/300x200/f4a261/ffffff.png?text=Dress', tags: JSON.stringify(['clothing', 'women', 'dress']), lowStockThreshold: 10,
+    },
+     {
+      id: 'prod_cap_unisex', name: 'Unisex Baseball Cap', sku: 'UNI-CAP-001', category: 'Accessories', quantity: 200, price: 15.99, costPrice: 6.50, supplier: 'Headwear Inc.', description: 'Adjustable and comfortable baseball cap for all.', imageUrl: 'https://placehold.co/300x200/2a9d8f/ffffff.png?text=Cap', tags: JSON.stringify(['accessory', 'unisex', 'cap']), lowStockThreshold: 25,
     },
   ];
 
@@ -138,8 +150,8 @@ async function main() {
             status: "Ordered", 
             discountAmount: 5.00,
             shippingCost: 5.00,
-            taxes: 0.00,
-            totalAmount: 66.00, 
+            taxes: 0.00, // Example: 0 taxes for this PO
+            totalAmount: ( (createdProducts[1].costPrice || 2.20) * 30 ) - 5.00 + 5.00,  // Subtotal - Discount + Shipping + Taxes
             createdById: adminUser.id,
             items: {
             create: [

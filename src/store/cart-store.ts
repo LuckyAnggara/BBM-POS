@@ -12,7 +12,7 @@ interface CartState {
   removeItem: (productId: string) => void;
   updateItemQuantity: (productId: string, quantity: number) => void;
   setDiscountAmount: (amount: number) => void;
-  setTaxPercent: (percent: number) => void;
+  setTaxPercent: (percent: number) => void; // Action to set tax rate, will be called from component
   setShippingCost: (cost: number) => void;
   clearCart: () => void;
   totalItems: () => number;
@@ -23,7 +23,7 @@ interface CartState {
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   discountAmount: 0,
-  taxPercent: 0,
+  taxPercent: 0, // Initialized to 0, will be updated from app settings
   shippingCost: 0,
   addItem: (product, quantity = 1) => {
     set(state => {
@@ -84,7 +84,9 @@ export const useCartStore = create<CartState>((set, get) => ({
   setTaxPercent: (percent) => set({ taxPercent: Math.max(0, percent) }),
   setShippingCost: (cost) => set({ shippingCost: Math.max(0, cost) }),
   clearCart: () => {
-    set({ items: [], discountAmount: 0, taxPercent: 0, shippingCost: 0 });
+    // Keep the taxPercent from settings, reset other cart-specific values
+    const currentTax = get().taxPercent;
+    set({ items: [], discountAmount: 0, shippingCost: 0, taxPercent: currentTax });
     toast.info('Cart cleared.');
   },
   totalItems: () => {
@@ -105,4 +107,3 @@ export const useCartStore = create<CartState>((set, get) => ({
     return Math.max(0, currentSubtotal - currentDiscount + taxAmountValue + currentShippingCost);
   },
 }));
-

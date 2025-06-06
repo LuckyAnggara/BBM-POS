@@ -2,7 +2,7 @@
 'use client';
 import { useCartStore } from '@/store/cart-store';
 import { useInventoryStore } from '@/store/inventory-store';
-import type { CartItem, SaleDataForCreation, Customer } from '@/lib/types';
+import type { CartItem, SaleDataForCreation, Customer, AppSettings } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
@@ -12,8 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { findOrCreateCustomer, recordSale } from '@/app/pos/actions';
+import { fetchAppSettings } from '@/app/admin/settings/actions'; // Import fetchAppSettings
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
@@ -24,13 +25,32 @@ export function CartDisplay() {
     items, removeItem, updateItemQuantity, clearCart, totalItems, 
     subtotal, grandTotal,
     discountAmount, setDiscountAmount,
-    taxPercent, setTaxPercent,
+    taxPercent, setTaxPercent, // taxPercent now comes from store, set by fetchAppSettings
     shippingCost, setShippingCost
   } = useCartStore();
   const { decreaseStock, getProductById } = useInventoryStore();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [customerName, setCustomerName] = useState(''); 
   const [promoCode, setPromoCode] = useState('');
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+
+  useEffect(() => {
+    async function loadInitialSettings() {
+      setIsLoadingSettings(true);
+      try {
+        const settings = await fetchAppSettings();
+        setTaxPercent(settings.defaultTaxRate); // Initialize tax rate from settings
+      } catch (error) {
+        console.error("Failed to load app settings for POS:", error);
+        toast.error("Could not load tax settings.");
+        // Keep default taxPercent (0) from store if fetch fails
+      } finally {
+        setIsLoadingSettings(false);
+      }
+    }
+    loadInitialSettings();
+  }, [setTaxPercent]);
+
 
   const handleQuantityChange = (productId: string, currentQuantity: number, change: number) => {
     const newQuantity = currentQuantity + change;
@@ -71,7 +91,7 @@ export function CartDisplay() {
       cartItems: items,
       subtotal: currentSubtotalVal,
       discountAmount,
-      taxPercent,
+      taxPercent, // taxPercent from store, which was set from AppSettings
       shippingCost,
       customerName: customerName.trim() || undefined, 
       customerId: foundCustomer?.id || undefined,
@@ -169,17 +189,53 @@ export function CartDisplay() {
       
       {items.length > 0 && (
         <CardFooter className="flex flex-col gap-3 p-4 border-t mt-auto">
-          <p className="text-sm font-medium self-start">Payment Details</p>
+          <Input 
+            id="customerName" 
+            type="text" 
+            placeholder="Customer Name (Optional)" 
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            disabled={isCheckingOut}
+            className="h-10"
+          />
+          <div className="grid grid-cols-2 gap-2 w-full">
+            <div className="space-y-1">
+              <Label htmlFor="discountAmount" className="text-xs">Discount Amount ($)</Label>
+              <Input 
+                id="discountAmount" 
+                type="number" 
+                placeholder="0.00" 
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                disabled={isCheckingOut}
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1">
+                <Label htmlFor="shippingCost" className="text-xs">Shipping Cost ($)</Label>
+                <Input 
+                    id="shippingCost" 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={shippingCost}
+                    onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
+                    disabled={isCheckingOut}
+                    className="h-9"
+                />
+            </div>
+          </div>
+          
+          <p className="text-sm font-medium self-start mt-2">Payment Details</p>
           <div className="w-full flex justify-between text-sm">
             <span className="text-muted-foreground">Sub Totals</span>
             <span>${currentSubtotal.toFixed(2)}</span>
           </div>
           <div className="w-full flex justify-between text-sm">
             <span className="text-muted-foreground">Discount</span>
-            <span className={discountAmount > 0 ? "text-green-600" : ""}>${discountAmount.toFixed(2)}</span>
+            <span className={discountAmount > 0 ? "text-green-600" : ""}>-${discountAmount.toFixed(2)}</span>
           </div>
           <div className="w-full flex justify-between text-sm">
-            <span className="text-muted-foreground">PPN {taxPercent.toFixed(0)}%</span>
+            <span className="text-muted-foreground">PPN {isLoadingSettings ? <Loader2 className="h-3 w-3 inline animate-spin"/> : `${taxPercent.toFixed(1)}%`}</span>
             <span>${currentTaxAmount.toFixed(2)}</span>
           </div>
            {shippingCost > 0 && (
@@ -233,10 +289,10 @@ export function CartDisplay() {
             </SelectContent>
           </Select>
 
-          <Button size="lg" className="w-full mt-2 h-12 text-base" onClick={handleCheckout} disabled={isCheckingOut}>
-            {isCheckingOut ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+          <Button size="lg" className="w-full mt-2 h-12 text-base" onClick={handleCheckout} disabled={isCheckingOut || isLoadingSettings}>
+            {isCheckingOut || isLoadingSettings ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
             Pay
-            {isCheckingOut ? "" : <span className="ml-1">➔</span>}
+            {isCheckingOut || isLoadingSettings ? "" : <span className="ml-1">➔</span>}
           </Button>
         </CardFooter>
       )}

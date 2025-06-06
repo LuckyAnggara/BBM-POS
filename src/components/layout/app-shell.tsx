@@ -1,6 +1,7 @@
 
 'use client';
 import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react'; // Added useEffect and useState
 import {
   SidebarProvider,
   Sidebar,
@@ -30,26 +31,46 @@ import {
   LogOut,
   SlidersHorizontal,
   Building,
-  Home, // Added for Admin Overview consistency if needed
+  Home,
+  ListTree, // Icon for categories
+  Loader2 // Ensure Loader2 is imported
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { fetchDistinctProductCategories } from '@/app/inventory/actions'; // Import action
 
 interface AppShellProps {
   children: ReactNode;
 }
 
-const navItems = [
+interface NavItem {
+  href?: string;
+  label: string;
+  icon: React.ElementType;
+  subItems?: NavItem[];
+  isDynamic?: boolean; // Flag for dynamic sub-items
+}
+
+
+const baseNavItems: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/inventory', label: 'Inventory', icon: Warehouse },
+  {
+    href: '/inventory', // Keep href for "All Products" link
+    label: 'Inventory',
+    icon: Warehouse,
+    isDynamic: true, // Mark this item for dynamic sub-items (categories)
+    subItems: [ // Default sub-item, will be prepended to categories
+        { href: '/inventory', label: 'All Products', icon: Package }
+    ]
+  },
   { href: '/pos', label: 'Point of Sale', icon: ShoppingCart },
   { href: '/purchasing', label: 'Purchasing', icon: ShoppingBag },
   {
     label: 'Admin',
     icon: SlidersHorizontal,
     subItems: [
-      { href: '/admin', label: 'Overview', icon: Home }, 
+      { href: '/admin', label: 'Overview', icon: Home },
       { href: '/admin/users', label: 'Users', icon: Users },
-      { href: '/admin/products', label: 'Products', icon: Package },
+      { href: '/admin/products', label: 'Product Catalog', icon: Package },
       { href: '/admin/settings', label: 'System Settings', icon: Settings },
     ],
   },
@@ -57,6 +78,46 @@ const navItems = [
 
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
+  const [navItems, setNavItems] = useState<NavItem[]>(baseNavItems);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
+  useEffect(() => {
+    async function loadCategories() {
+      setIsLoadingCategories(true);
+      try {
+        const categories = await fetchDistinctProductCategories();
+
+        setNavItems(currentBaseNavItems =>
+          currentBaseNavItems.map(item => {
+            if (item.isDynamic && item.label === 'Inventory') {
+              const categorySubItems = categories.map(category => ({
+                href: `/inventory?category=${encodeURIComponent(category)}`,
+                label: category,
+                icon: ListTree, // Using ListTree icon for categories
+              }));
+              return {
+                ...item,
+                // If Inventory is to become a parent, its direct href might be removed or point to a general inventory overview
+                // For now, its href will link to all products, and it will also have sub-items.
+                // Ensure "All Products" is always first if it exists in base.
+                subItems: [
+                  ...(item.subItems?.filter(sub => sub.label === "All Products") || []),
+                  ...categorySubItems
+                ],
+              };
+            }
+            return item;
+          })
+        );
+      } catch (error) {
+        console.error("Failed to load categories for sidebar:", error);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    }
+    loadCategories();
+  }, []);
+
 
   return (
     <SidebarProvider defaultOpen>
@@ -70,12 +131,16 @@ export function AppShell({ children }: AppShellProps) {
         <SidebarContent className="flex-1 p-0">
           <SidebarMenu className="gap-1 p-2">
             {navItems.map((item) =>
-              item.subItems ? (
+              item.subItems && item.subItems.length > 0 ? ( // Check if subItems exist and have length
                 <SidebarMenuItem key={item.label} className="relative">
                   <SidebarMenuButton
                     className="justify-between"
-                    asChild={false} 
-                    isActive={item.subItems.some(sub => pathname === sub.href || (pathname && sub.href !== '/admin' && pathname.startsWith(sub.href)) || (sub.href === '/admin' && pathname === '/admin') || (sub.href === '/admin' && pathname.startsWith('/admin/')))}
+                    asChild={false}
+                    // isActive logic needs to consider if any subItem is active or if the parent path matches
+                    isActive={
+                        (item.href && pathname === item.href) || // Parent item itself is active
+                        item.subItems.some(sub => pathname === sub.href || (sub.href && sub.href !== '/' && pathname.startsWith(sub.href)))
+                    }
                     tooltip={{content: item.label, side: 'right', align: 'center' }}
                   >
                     <span className="flex items-center gap-2">
@@ -85,11 +150,18 @@ export function AppShell({ children }: AppShellProps) {
                     <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180 group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                   <SidebarMenuSub>
+                    {item.isDynamic && item.label === 'Inventory' && isLoadingCategories && (
+                       <SidebarMenuItem>
+                         <SidebarMenuSubButton asChild={false} className="opacity-50">
+                            <Loader2 className="size-3.5 animate-spin mr-2" /> Loading Categories...
+                         </SidebarMenuSubButton>
+                       </SidebarMenuItem>
+                    )}
                     {item.subItems.map((subItem) => (
-                      <SidebarMenuItem key={subItem.href}>
-                        <Link href={subItem.href} legacyBehavior passHref>
+                      <SidebarMenuItem key={subItem.href || subItem.label}>
+                        <Link href={subItem.href || '#'} legacyBehavior passHref>
                           <SidebarMenuSubButton
-                            asChild={false} // SidebarMenuSubButton renders <a> by default
+                            asChild={false}
                             isActive={pathname === subItem.href || (subItem.href === '/admin' && pathname.startsWith('/admin/'))}
                           >
                             <subItem.icon className="size-3.5" />
@@ -101,14 +173,14 @@ export function AppShell({ children }: AppShellProps) {
                   </SidebarMenuSub>
                 </SidebarMenuItem>
               ) : (
-                <SidebarMenuItem key={item.href}>
-                  <Link href={item.href} legacyBehavior passHref>
+                <SidebarMenuItem key={item.href || item.label}>
+                  <Link href={item.href || '#'} legacyBehavior passHref>
                     <SidebarMenuButton
                       isActive={pathname === item.href}
-                      asChild={true} // Changed to true
+                      asChild={true}
                       tooltip={{content: item.label, side: 'right', align: 'center' }}
                     >
-                      <a> {/* Added <a> wrapper for icon and span */}
+                      <a>
                         <item.icon />
                         <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                       </a>
@@ -149,4 +221,3 @@ export function AppShell({ children }: AppShellProps) {
     </SidebarProvider>
   );
 }
-

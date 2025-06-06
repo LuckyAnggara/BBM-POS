@@ -19,7 +19,7 @@ model Product {
   supplier          String?
   description       String?
   imageUrl          String?
-  tags              String? // JSON string for tags: ["tag1", "tag2"]
+  tags              String? // Stored as JSON string: ["tag1", "tag2"]
   lowStockThreshold Int?
 
   createdAt DateTime @default(now())
@@ -27,8 +27,6 @@ model Product {
 
   purchaseOrderItems PurchaseOrderItem[]
   saleItems          SaleItem[]
-
-  @@index([name])
 }
 
 model User {
@@ -43,66 +41,59 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  purchaseOrders PurchaseOrder[] // User who created the PO
-  sales          Sale[]          // User (cashier/seller) who processed the sale
+  purchaseOrders PurchaseOrder[]
+  sales          Sale[]
 }
 
 model PurchaseOrder {
-  id                   String   @id @default(cuid())
-  poNumber             String   @unique
-  supplierName         String
-  orderDate            DateTime
-  expectedDeliveryDate DateTime?
-  status               String // e.g., "Draft", "Ordered", "Received", "Cancelled"
-  
-  items PurchaseOrderItem[]
-
-  discountAmount Float?
-  shippingCost   Float?
-  taxes          Float?
-  totalAmount    Float
-
-  notes String?
-
-  createdById String
-  createdBy   User   @relation(fields: [createdById], references: [id])
+  id                    String   @id @default(cuid())
+  poNumber              String   @unique
+  supplierName          String
+  orderDate             DateTime
+  expectedDeliveryDate  DateTime?
+  status                String // e.g., "Draft", "Ordered", "Received", "Cancelled"
+  items                 PurchaseOrderItem[]
+  discountAmount        Float?   @default(0)
+  shippingCost          Float?   @default(0)
+  taxes                 Float?   @default(0) // Could be amount or percentage based on convention
+  totalAmount           Float
+  notes                 String?
+  createdById           String
+  createdBy             User     @relation(fields: [createdById], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([poNumber])
-  @@index([status])
 }
 
 model PurchaseOrderItem {
-  id        String  @id @default(cuid())
-  productName String // Denormalized for easier display on PO if product is deleted
-  quantityOrdered  Int
-  quantityReceived Int?
-  unitCost         Float
-  totalCost        Float // quantityOrdered * unitCost
-
-  purchaseOrderId String
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
+  id                String   @id @default(cuid())
+  purchaseOrderId   String
+  purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product  @relation(fields: [productId], references: [id])
+  productName       String // Denormalized for easier display on PO
+  quantityOrdered   Int
+  quantityReceived  Int?
+  unitCost          Float
+  totalCost         Float    // quantityOrdered * unitCost
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model AppSettings {
-  id                 String    @id @default("main_settings") // Ensures only one row for settings
-  appName            String    @default("StockPilot")
-  dateFormat         String    @default("MM/dd/yyyy")
-  timeZone           String    @default("America/New_York")
-  defaultCurrency    String    @default("USD")
-  emailNotifications Boolean   @default(true)
-  lowStockAlerts     Boolean   @default(true)
-  newOrderAlerts     Boolean   @default(false)
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                 String   @id @default("main_settings") // Ensure only one record
+  appName            String   @default("StockPilot")
+  dateFormat         String   @default("MM/dd/yyyy")
+  timeZone           String   @default("America/New_York")
+  defaultCurrency    String   @default("USD")
+  emailNotifications Boolean  @default(true)
+  lowStockAlerts     Boolean  @default(true)
+  newOrderAlerts     Boolean  @default(false)
+  defaultTaxRate     Float    @default(0) // e.g., 10 for 10%
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Customer {
@@ -115,51 +106,39 @@ model Customer {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([name])
-  @@index([email])
 }
 
 model Sale {
-  id           String   @id @default(cuid())
-  saleNumber   String   @unique // e.g., SALE-YYYYMMDD-HHMMSS-RANDOM
-  saleDate     DateTime @default(now())
-  
+  id             String   @id @default(cuid())
+  saleNumber     String   @unique
+  saleDate       DateTime
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id])
+  customerName   String? // Denormalized if customer is not registered or for quick display
+  userId         String   // Cashier/User who made the sale
+  user           User     @relation(fields: [userId], references: [id])
+  items          SaleItem[]
   subtotal       Float
   discountAmount Float    @default(0)
-  taxPercent     Float    @default(0) // e.g., 10 for 10%
-  taxAmount      Float    @default(0) // Calculated: (subtotal - discountAmount) * taxPercent / 100
+  taxPercent     Float    @default(0) // The tax percentage applied at the time of sale
+  taxAmount      Float    @default(0) // Calculated tax amount
   shippingCost   Float    @default(0)
-  grandTotal     Float    // Calculated: subtotal - discountAmount + taxAmount + shippingCost
-  
-  customerName String? // Denormalized, or for guest checkouts
-  customerId   String?
-  customer     Customer? @relation(fields: [customerId], references: [id])
-
-  userId String // Cashier/Seller ID
-  user   User   @relation(fields: [userId], references: [id])
-
-  items SaleItem[]
+  grandTotal     Float
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([saleNumber])
-  @@index([saleDate])
 }
 
 model SaleItem {
-  id          String @id @default(cuid())
-  productName String // Denormalized name at the time of sale
-  quantity    Int
-  unitPrice   Float  // Price at the time of sale
-  totalPrice  Float  // quantity * unitPrice
-
-  saleId String
-  sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
-
-  productId String
-  product   Product @relation(fields: [productId], references: [id]) // Relation to original product
+  id         String @id @default(cuid())
+  saleId     String
+  sale       Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  productName String // Denormalized product name at time of sale
+  quantity   Int
+  unitPrice  Float  // Price of product at time of sale
+  totalPrice Float  // quantity * unitPrice
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Bell, Building, Palette, ShieldCheck, Loader2 } from "lucide-react";
+import { Save, Bell, Building, Palette, ShieldCheck, Loader2, Percent } from "lucide-react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -37,6 +37,7 @@ const generalSettingsSchema = z.object({
   dateFormat: z.string(),
   timeZone: z.string(),
   defaultCurrency: z.string().length(3, "Currency code must be 3 letters"),
+  defaultTaxRate: z.coerce.number().min(0, "Tax rate must be non-negative").max(100, "Tax rate cannot exceed 100"),
 });
 
 type GeneralSettingsValues = z.infer<typeof generalSettingsSchema>;
@@ -72,6 +73,7 @@ export default function SettingsPage() {
           dateFormat: settings.dateFormat,
           timeZone: settings.timeZone,
           defaultCurrency: settings.defaultCurrency,
+          defaultTaxRate: settings.defaultTaxRate,
         });
         notificationForm.reset({
           emailNotifications: settings.emailNotifications,
@@ -137,7 +139,7 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>General Settings</CardTitle>
-                <CardDescription>Basic application settings.</CardDescription>
+                <CardDescription>Basic application settings including default tax rate.</CardDescription>
               </CardHeader>
               <CardContent>
                 {isGeneralLoading ? (
@@ -146,6 +148,7 @@ export default function SettingsPage() {
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-1/2" />
+                    <Skeleton className="h-10 w-full" /> 
                     <Skeleton className="h-10 w-48" />
                   </div>
                 ) : (
@@ -219,6 +222,23 @@ export default function SettingsPage() {
                             <Input placeholder="USD" {...field} />
                           </FormControl>
                           <FormDescription>Enter the 3-letter currency code (e.g., USD, EUR).</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                     <FormField
+                      control={generalForm.control}
+                      name="defaultTaxRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Default Tax Rate (%)</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                               <Input type="number" placeholder="e.g., 10" {...field} className="pr-8" />
+                               <Percent className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            </div>
+                          </FormControl>
+                          <FormDescription>Set the default sales tax rate (0-100).</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}

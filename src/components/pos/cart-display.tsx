@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2, User as UserIcon, Percent, Truck, Tag as DiscountIcon, ChevronDown } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2, User as UserIcon, Percent, Truck, Tag as DiscountIcon, ChevronDown, DollarSign } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -29,7 +29,7 @@ export function CartDisplay() {
   } = useCartStore();
   const { decreaseStock, getProductById } = useInventoryStore();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  const [customerName, setCustomerName] = useState(''); // Keeping customer name for now, can be removed if not needed
+  const [customerName, setCustomerName] = useState(''); 
   const [promoCode, setPromoCode] = useState('');
 
   const handleQuantityChange = (productId: string, currentQuantity: number, change: number) => {
@@ -48,13 +48,14 @@ export function CartDisplay() {
     for (const item of items) {
       const productInInventory = getProductById(item.productId);
       if (!productInInventory || productInInventory.quantity < item.quantity) {
-        toast.error(\`Not enough stock for \${item.name}. Available: \${productInInventory?.quantity || 0}. Required: \${item.quantity}\`);
+        toast.error(`Not enough stock for ${item.name}. Available: ${productInInventory?.quantity || 0}. Required: ${item.quantity}`);
         setIsCheckingOut(false);
         return;
       }
     }
     let foundCustomer: Customer | null = null;
-    if (customerName.trim()) {
+    
+    if (customerName.trim()) { 
       try {
         foundCustomer = await findOrCreateCustomer(customerName.trim());
       } catch (error) {
@@ -72,7 +73,7 @@ export function CartDisplay() {
       discountAmount,
       taxPercent,
       shippingCost,
-      customerName: customerName.trim() || undefined,
+      customerName: customerName.trim() || undefined, 
       customerId: foundCustomer?.id || undefined,
     };
     try {
@@ -80,8 +81,8 @@ export function CartDisplay() {
       for (const item of items) {
         await decreaseStock(item.productId, item.quantity);
       }
-      toast.success(\`Sale \${recordedSale.saleNumber} successful!\`, {
-          description: \`\${customerName ? \`Customer: \${customerName}. \` : ''}Total: $\${recordedSale.grandTotal.toFixed(2)} for \${totalItems()} items.\`
+      toast.success(`Sale ${recordedSale.saleNumber} successful!`, {
+          description: `${customerName ? `Customer: ${customerName}. ` : ''}Total: $${recordedSale.grandTotal.toFixed(2)} for ${totalItems()} items.`
       });
       clearCart();
       setCustomerName('');
@@ -95,8 +96,6 @@ export function CartDisplay() {
   };
 
   const currentSubtotal = subtotal();
-  // PPN calculation from image seems to be on subtotal (before discount)
-  // Replicating image: Tax (PPN) is calculated on (Subtotal - Discount)
   const taxableAmount = Math.max(0, currentSubtotal - discountAmount);
   const currentTaxAmount = taxableAmount * (taxPercent / 100); 
   const currentGrandTotal = grandTotal();
@@ -113,8 +112,6 @@ export function CartDisplay() {
         <CardDescription className="text-xs">CART DETAILS</CardDescription>
       </CardHeader>
       
-      {/* Customer Name input removed as per image focus on cart items and payment */}
-
       <ScrollArea className="flex-1">
         <CardContent className="p-0">
           {items.length === 0 ? (
@@ -132,7 +129,7 @@ export function CartDisplay() {
                   <Image
                     src={item.imageUrl || "https://placehold.co/64x64.png"}
                     alt={item.name}
-                    width={56} // Slightly smaller image
+                    width={56} 
                     height={56}
                     className="rounded-md object-cover border"
                     data-ai-hint="product thumbnail"
@@ -163,7 +160,6 @@ export function CartDisplay() {
                       </Button>
                     </div>
                      <p className="text-sm font-semibold mt-1">${(item.price * item.quantity).toFixed(2)}</p>
-                     {/* Remove button can be added here if needed, or use quantity 0 to remove */}
                   </div>
                 </li>
               ))}
@@ -186,7 +182,6 @@ export function CartDisplay() {
             <span className="text-muted-foreground">PPN {taxPercent.toFixed(0)}%</span>
             <span>${currentTaxAmount.toFixed(2)}</span>
           </div>
-          {/* Shipping cost not shown in the example's payment details, but keeping the logic */}
            {shippingCost > 0 && (
             <div className="w-full flex justify-between text-sm text-muted-foreground">
               <span>Shipping</span>
@@ -212,7 +207,6 @@ export function CartDisplay() {
             <Button variant="outline" className="h-10" onClick={() => toast.info("Promo code applied (placeholder).")} disabled={isCheckingOut || !promoCode}>Apply</Button>
           </div>
 
-          {/* Payment Method Selector - Placeholder */}
           <Select defaultValue="visa" disabled={isCheckingOut}>
             <SelectTrigger className="w-full h-10">
                 <SelectValue placeholder="Select payment method" />
@@ -220,7 +214,7 @@ export function CartDisplay() {
             <SelectContent>
                 <SelectItem value="visa">
                     <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4"/> {/* Generic card icon for now */}
+                        <CreditCard className="h-4 w-4"/> 
                         VISA
                     </div>
                 </SelectItem>

@@ -45,6 +45,7 @@ export async function fetchAllProductsAction(includeCategory: boolean = true): P
         category: includeCategory, // Include category data based on parameter
       },
     });
+    console.log('Product', dbProducts)
     return dbProducts.map(mapPrismaProductToAppProduct);
   } catch (error) {
     console.error('Failed to fetch products action:', error);

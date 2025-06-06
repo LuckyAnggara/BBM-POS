@@ -33,11 +33,10 @@ import {
   Building,
   Home,
   ListTree, 
-  Loader2 
-} from 'lucide-react';
+} from 'lucide-react'; // Removed Loader2 as it's no longer used here
 import { usePathname } from 'next/navigation';
-import { fetchAllCategoriesAction } from '@/app/inventory/actions'; // Changed import
-import type { Category } from '@/lib/types'; // Import Category type
+// Removed: import { fetchAllCategoriesAction } from '@/app/inventory/actions';
+// Removed: import type { Category } from '@/lib/types'; 
 
 interface AppShellProps {
   children: ReactNode;
@@ -48,19 +47,16 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   subItems?: NavItem[];
-  isDynamic?: boolean; 
 }
 
 
 const baseNavItems: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   {
-    label: 'Inventory', // Parent label for Inventory
+    label: 'Inventory', 
     icon: Warehouse,
-    isDynamic: true, // Mark this item for dynamic sub-items (categories)
     subItems: [ 
         { href: '/inventory', label: 'All Products', icon: Package }
-        // Categories will be dynamically inserted here
     ]
   },
   { href: '/pos', label: 'Point of Sale', icon: ShoppingCart },
@@ -80,45 +76,9 @@ const baseNavItems: NavItem[] = [
 
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
-  const [navItems, setNavItems] = useState<NavItem[]>(baseNavItems);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  // Removed useState for navItems and isLoadingCategories
 
-  useEffect(() => {
-    async function loadCategories() {
-      setIsLoadingCategories(true);
-      try {
-        const fetchedCategories: Category[] = await fetchAllCategoriesAction(); // Use new action
-
-        setNavItems(currentBaseNavItems =>
-          currentBaseNavItems.map(item => {
-            if (item.isDynamic && item.label === 'Inventory') {
-              const categorySubItems = fetchedCategories.map(category => ({
-                href: `/inventory?categoryName=${encodeURIComponent(category.name)}`, // Filter by name for now
-                label: category.name,
-                icon: ListTree, 
-              }));
-              return {
-                ...item,
-                // The parent "Inventory" item itself might not have an href if it's just a grouper
-                // For now, let's keep its subItems structure consistent
-                subItems: [
-                  ...(item.subItems?.filter(sub => sub.label === "All Products") || []),
-                  ...categorySubItems
-                ].sort((a, b) => (a.label === "All Products" ? -1 : b.label === "All Products" ? 1 : a.label.localeCompare(b.label))), // Keep All Products first
-              };
-            }
-            return item;
-          })
-        );
-      } catch (error) {
-        console.error("Failed to load categories for sidebar:", error);
-      } finally {
-        setIsLoadingCategories(false);
-      }
-    }
-    loadCategories();
-  }, []);
-
+  // Removed useEffect that fetched categories
 
   return (
     <SidebarProvider defaultOpen>
@@ -131,7 +91,7 @@ export function AppShell({ children }: AppShellProps) {
         </SidebarHeader>
         <SidebarContent className="flex-1 p-0">
           <SidebarMenu className="gap-1 p-2">
-            {navItems.map((item) =>
+            {baseNavItems.map((item) => // Use baseNavItems directly
               item.subItems && item.subItems.length > 0 ? ( 
                 <SidebarMenuItem key={item.label} className="relative">
                   <SidebarMenuButton
@@ -150,19 +110,12 @@ export function AppShell({ children }: AppShellProps) {
                     <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180 group-data-[collapsible=icon]:hidden" />
                   </SidebarMenuButton>
                   <SidebarMenuSub>
-                    {item.isDynamic && item.label === 'Inventory' && isLoadingCategories && (
-                       <SidebarMenuItem>
-                         <SidebarMenuSubButton asChild={false} className="opacity-50 cursor-default">
-                            <Loader2 className="size-3.5 animate-spin mr-2" /> Loading Categories...
-                         </SidebarMenuSubButton>
-                       </SidebarMenuItem>
-                    )}
+                    {/* Removed dynamic category loading indicator */}
                     {item.subItems.map((subItem) => (
                       <SidebarMenuItem key={subItem.href || subItem.label}>
                         <Link href={subItem.href || '#'} legacyBehavior passHref>
                           <SidebarMenuSubButton
                             asChild={false}
-                            // Adjusted isActive for admin parent and specific child match
                             isActive={pathname === subItem.href || (item.label === 'Admin' && subItem.href === '/admin' && pathname.startsWith('/admin'))}
                           >
                             <subItem.icon className="size-3.5" />

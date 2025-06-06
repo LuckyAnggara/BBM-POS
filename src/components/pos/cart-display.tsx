@@ -7,14 +7,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2, User as UserIcon, Percent, LogOut, DollarSign } from 'lucide-react'; // Ditambahkan LogOut
+import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2, User as UserIcon, Percent, XCircle, DollarSign } from 'lucide-react'; // Changed LogOut to XCircle
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
-import { findOrCreateCustomer, recordSale } from '@/app/pos/actions';
-import { fetchAppSettings } from '@/app/admin/settings/actions';
+import { findOrCreateCustomer, recordSale } from '@/app/pos/actions'; // Corrected path
+import { fetchAppSettings } from '@/app/(app)/admin/settings/actions'; // Ensured precise path
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
 
@@ -68,7 +68,7 @@ export function CartDisplay() {
     for (const item of items) {
       const productInInventory = getProductById(item.productId);
       if (!productInInventory || productInInventory.quantity < item.quantity) {
-        toast.error(\`Not enough stock for \${item.name}. Available: \${productInInventory?.quantity || 0}. Required: \${item.quantity}\`);
+        toast.error("Not enough stock for " + item.name + ". Available: " + (productInInventory?.quantity || 0) + ". Required: " + item.quantity);
         setIsCheckingOut(false);
         return;
       }
@@ -101,8 +101,8 @@ export function CartDisplay() {
       for (const item of items) {
         await decreaseStock(item.productId, item.quantity);
       }
-      toast.success(\`Sale \${recordedSale.saleNumber} successful!\`, {
-          description: \`\${customerName ? \`Customer: \${customerName}. \` : ''}Total: $\${recordedSale.grandTotal.toFixed(2)} for \${totalItems()} items.\`
+      toast.success("Sale " + recordedSale.saleNumber + " successful!", {
+          description: (customerName ? "Customer: " + customerName + ". " : '') + "Total: $" + recordedSale.grandTotal.toFixed(2) + " for " + totalItems() + " items."
       });
       clearCart();
       setCustomerName('');
@@ -134,7 +134,7 @@ export function CartDisplay() {
                 </Button>
                  <Link href="/" legacyBehavior passHref>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Exit POS">
-                       <LogOut className="h-4 w-4"/>
+                       <XCircle className="h-4 w-4"/>
                     </Button>
                 </Link>
             </div>
@@ -244,7 +244,7 @@ export function CartDisplay() {
             <span className={discountAmount > 0 ? "text-green-600" : ""}>-${discountAmount.toFixed(2)}</span>
           </div>
           <div className="w-full flex justify-between text-xs">
-            <span className="text-muted-foreground">PPN {isLoadingSettings ? <Loader2 className="h-3 w-3 inline animate-spin"/> : \`\${taxPercent.toFixed(1)}%\`}</span>
+            <span className="text-muted-foreground">PPN {isLoadingSettings ? <Loader2 className="h-3 w-3 inline animate-spin"/> : taxPercent.toFixed(1) + '%'}</span>
             <span>${currentTaxAmount.toFixed(2)}</span>
           </div>
            {shippingCost > 0 && (
@@ -308,3 +308,5 @@ export function CartDisplay() {
     </Card>
   );
 }
+
+    

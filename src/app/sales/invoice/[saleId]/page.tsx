@@ -11,7 +11,8 @@ import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { ArrowLeft, Printer, Building, UserCircle, Hash, CalendarDays, CreditCard, FileText, ShoppingBag, Percent, Truck, DollarSign } from 'lucide-react';
 import type { Sale } from '@/lib/types';
-import { fetchSaleById } from '../../actions'; // Adjusted import path
+import { fetchSaleById } from '../../actions';
+import { Badge } from '@/components/ui/badge';
 
 // Placeholder company details
 const companyDetails = {
@@ -180,8 +181,8 @@ export default function InvoicePage() {
                     <span className="text-muted-foreground">Shipping:</span>
                     <span className="font-medium">${sale.shippingCost.toFixed(2)}</span>
                   </div>
-                </div>
-                <div className="border-t my-1"></div>
+                )}
+                <div className="border-t my-1" />
                 <div className="flex justify-between text-base font-bold">
                   <span>Grand Total:</span>
                   <span>${sale.grandTotal.toFixed(2)}</span>

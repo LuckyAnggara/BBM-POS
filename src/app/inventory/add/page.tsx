@@ -172,7 +172,7 @@ export default function AddProductPage() {
                             {cat.name}
                           </SelectItem>
                         ))}
-                         <SelectItem value=""><em>Uncategorized</em></SelectItem>
+                         <SelectItem value="0"><em>Uncategorized</em></SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

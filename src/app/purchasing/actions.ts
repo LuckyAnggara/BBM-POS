@@ -2,21 +2,85 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import type { PurchaseOrder as AppPurchaseOrder, PurchaseOrderItem as AppPurchaseOrderItem, PurchaseOrderStatus, StockMovementTypeEnum } from '@/lib/types';
+import type { PurchaseOrder as AppPurchaseOrder, PurchaseOrderItem as AppPurchaseOrderItem, PurchaseOrderStatus, StockMovementTypeEnum, Product, Category, User as AppUser } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import type { PurchaseOrderFormValues } from './create/page'; 
-import { increaseProductStockAction } from '@/app/inventory/actions'; // Import for stock updates
+import { increaseProductStockAction } from '@/app/inventory/actions'; 
+
+// Define a local mapper for Product if mapPrismaProductToAppProduct from inventory/actions isn't easily reusable
+// to avoid circular dependencies or overly complex imports.
+// This is a simplified version; ideally, this mapping logic should be centralized.
+const mapPrismaProductToAppProductLocal = (prismaProduct: any): Product => {
+  if (!prismaProduct) return undefined as unknown as Product; // Should not happen if called with valid product
+  return {
+    id: prismaProduct.id,
+    name: prismaProduct.name,
+    sku: prismaProduct.sku,
+    quantity: prismaProduct.quantity,
+    price: prismaProduct.price ? prismaProduct.price.toNumber() : 0,
+    costPrice: prismaProduct.costPrice ? prismaProduct.costPrice.toNumber() : null,
+    supplier: prismaProduct.supplier ?? undefined,
+    description: prismaProduct.description ?? undefined,
+    imageUrl: prismaProduct.imageUrl ?? undefined,
+    lowStockThreshold: prismaProduct.lowStockThreshold ?? undefined,
+    tags: prismaProduct.tags ? JSON.parse(prismaProduct.tags as string) : [],
+    categoryId: prismaProduct.categoryId,
+    category: prismaProduct.category ? {
+        id: prismaProduct.category.id,
+        name: prismaProduct.category.name,
+        createdAt: prismaProduct.category.createdAt.toISOString(),
+        updatedAt: prismaProduct.category.updatedAt.toISOString(),
+    } : null,
+    createdAt: prismaProduct.createdAt.toISOString(),
+    updatedAt: prismaProduct.updatedAt.toISOString(),
+  };
+};
+
+
+const mapPrismaUserToAppUser = (prismaUser: any): AppUser | undefined => {
+  if (!prismaUser) return undefined;
+  return {
+    id: prismaUser.id,
+    name: prismaUser.name,
+    email: prismaUser.email,
+    role: prismaUser.role,
+    avatarUrl: prismaUser.avatarUrl ?? undefined,
+    isActive: prismaUser.isActive,
+    lastLogin: prismaUser.lastLogin?.toISOString() ?? null,
+    createdAt: prismaUser.createdAt.toISOString(),
+    updatedAt: prismaUser.updatedAt.toISOString(),
+  };
+};
+
 
 const mapPrismaPOToAppPO = (dbPO: any): AppPurchaseOrder => {
   return {
-    ...dbPO,
+    id: dbPO.id,
+    poNumber: dbPO.poNumber,
+    supplierName: dbPO.supplierName,
     orderDate: dbPO.orderDate.toISOString(),
     expectedDeliveryDate: dbPO.expectedDeliveryDate?.toISOString() || null,
     status: dbPO.status as PurchaseOrderStatus,
+    // Convert Decimal fields to numbers
+    discountAmount: dbPO.discountAmount ? dbPO.discountAmount.toNumber() : null,
+    shippingCost: dbPO.shippingCost ? dbPO.shippingCost.toNumber() : null,
+    taxes: dbPO.taxes ? dbPO.taxes.toNumber() : null,
+    totalAmount: dbPO.totalAmount.toNumber(), // totalAmount is not nullable
+    notes: dbPO.notes ?? null,
+    createdById: dbPO.createdById,
+    createdBy: dbPO.createdBy ? mapPrismaUserToAppUser(dbPO.createdBy) : undefined,
     createdAt: dbPO.createdAt.toISOString(),
     updatedAt: dbPO.updatedAt.toISOString(),
     items: dbPO.items.map((item: any) => ({
-      ...item,
+      id: item.id,
+      productId: item.productId,
+      productName: item.productName,
+      quantityOrdered: item.quantityOrdered,
+      quantityReceived: item.quantityReceived ?? null,
+      // Convert Decimal fields to numbers
+      unitCost: item.unitCost.toNumber(),
+      totalCost: item.totalCost.toNumber(),
+      product: item.product ? mapPrismaProductToAppProductLocal(item.product) : undefined,
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString(),
     })),
@@ -29,7 +93,7 @@ export async function fetchPurchaseOrders(): Promise<AppPurchaseOrder[]> {
     const dbPOs = await prisma.purchaseOrder.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        items: { include: { product: true } }, 
+        items: { include: { product: { include: { category: true } } } }, // Ensure category is included for product mapping
         createdBy: true, 
       },
     });
@@ -45,7 +109,7 @@ export async function fetchPurchaseOrderById(id: string): Promise<AppPurchaseOrd
     const dbPO = await prisma.purchaseOrder.findUnique({
       where: { id },
       include: {
-        items: { include: { product: true } },
+        items: { include: { product: { include: { category: true } } } }, // Ensure category is included
         createdBy: true,
       },
     });
@@ -91,7 +155,7 @@ export async function createPurchaseOrder(data: PurchaseOrderFormValues, created
           })),
         },
       },
-      include: { items: { include: {product: true} }, createdBy: true },
+      include: { items: { include: {product: {include: {category: true}}} }, createdBy: true },
     });
     revalidatePath('/purchasing');
     revalidatePath(`/purchasing/${newDbPO.id}`);
@@ -123,7 +187,7 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
             quantityOrdered: item.quantityOrdered,
             unitCost: item.unitCost,
             totalCost: item.quantityOrdered * item.unitCost,
-            quantityReceived: item.quantityReceived ?? null, // Use value from form
+            quantityReceived: item.quantityReceived ?? null, 
         }));
         
         const po = await tx.purchaseOrder.update({
@@ -143,7 +207,7 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
                     create: newItemsData
                 }
             },
-            include: { items: { include: {product: true} }, createdBy: true },
+            include: { items: { include: {product: {include: {category: true}}} }, createdBy: true },
         });
         return po;
     });
@@ -160,7 +224,6 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
 
 export async function deletePurchaseOrderById(id: string): Promise<void> {
   try {
-    // Also delete related POItems if not handled by onDelete: Cascade
     await prisma.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: id } });
     await prisma.purchaseOrder.delete({
       where: { id },
@@ -183,29 +246,27 @@ export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrde
       throw new Error(`Purchase Order with ID ${id} not found.`);
     }
 
-    const updatedPo = await tx.purchaseOrder.update({
+    const updatedPoData = await tx.purchaseOrder.update({
       where: { id },
       data: { status },
-      include: { items: { include: { product: true } }, createdBy: true },
+      include: { items: { include: { product: {include: {category: true}} } }, createdBy: true },
     });
 
     if (status === 'Received' && itemsToReceive) {
       for (const item of itemsToReceive) {
-        if (item.id) { // Ensure item.id is valid
-          // Update PurchaseOrderItem quantityReceived
+        if (item.id) { 
           await tx.purchaseOrderItem.update({
             where: { id: item.id },
-            data: { quantityReceived: item.quantityOrdered } // Assuming full quantity received
+            data: { quantityReceived: item.quantityOrdered } 
           });
           
-          // Increase product stock and log movement
           await increaseProductStockAction(
             item.productId,
-            item.quantityOrdered, // Quantity to increase
-            'PURCHASE_RECEIPT', // StockMovementTypeEnum.PURCHASE_RECEIPT
+            item.quantityOrdered, 
+            'PURCHASE_RECEIPT', 
             `Received from PO #${po.poNumber}`,
             po.id,
-            po.createdById // User who created the PO, or a dedicated receiving user if applicable
+            po.createdById 
           );
         } else {
           console.warn(`Item ${item.productName} is missing an ID, cannot update quantityReceived or stock.`);
@@ -223,9 +284,10 @@ export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrde
         revalidatePath('/inventory');
     }
 
-    return mapPrismaPOToAppPO(updatedPo);
+    return mapPrismaPOToAppPO(updatedPoData);
   }).catch(error => {
       console.error(`Failed to update status for PO ${id}:`, error);
       throw new Error('Could not update PO status.');
   });
 }
+

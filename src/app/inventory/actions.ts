@@ -7,13 +7,18 @@ import { revalidatePath } from 'next/cache';
 
 const mapPrismaProductToAppProduct = (prismaProduct: any): Product => {
   return {
-    ...prismaProduct,
-    costPrice: prismaProduct.costPrice ?? undefined,
+    id: prismaProduct.id,
+    name: prismaProduct.name,
+    sku: prismaProduct.sku,
+    quantity: prismaProduct.quantity,
+    price: prismaProduct.price ? prismaProduct.price.toNumber() : 0, // Convert Decimal to number
+    costPrice: prismaProduct.costPrice ? prismaProduct.costPrice.toNumber() : null, // Convert Decimal to number
     supplier: prismaProduct.supplier ?? undefined,
     description: prismaProduct.description ?? undefined,
     imageUrl: prismaProduct.imageUrl ?? undefined,
     lowStockThreshold: prismaProduct.lowStockThreshold ?? undefined,
     tags: prismaProduct.tags ? JSON.parse(prismaProduct.tags as string) : [],
+    categoryId: prismaProduct.categoryId,
     category: prismaProduct.category ? {
         id: prismaProduct.category.id,
         name: prismaProduct.category.name,
@@ -154,7 +159,7 @@ async function logStockMovement(
       throw new Error(`Stock quantity for ${product.name} cannot go below zero. Current: ${quantityBefore}, Change: ${quantityChange}`);
     }
     
-    const updatedProduct = await tx.product.update({
+    const updatedProductData = await tx.product.update({
       where: { id: productId },
       data: { quantity: quantityAfter },
       include: { category: true },
@@ -172,7 +177,8 @@ async function logStockMovement(
         userId,
       },
     });
-    return updatedProduct;
+    // Return the mapped product, not the raw prisma data
+    return mapPrismaProductToAppProduct(updatedProductData);
   });
 }
 
@@ -187,17 +193,18 @@ export async function decreaseProductStockAction(
 ): Promise<Product> {
   try {
     if (quantityToDecrease <= 0) throw new Error("Quantity to decrease must be positive.");
-    const updatedDbProduct = await logStockMovement(productId, movementType, -quantityToDecrease, reason, referenceId, userId);
+    // logStockMovement already returns a mapped product
+    const updatedAppProduct = await logStockMovement(productId, movementType, -quantityToDecrease, reason, referenceId, userId);
     
     revalidatePath('/inventory');
     revalidatePath(`/inventory/${productId}`);
     revalidatePath('/pos'); 
     revalidatePath('/admin/products'); 
     revalidatePath(`/inventory/${productId}/history`);
-    if (updatedDbProduct.category) {
-        revalidatePath(`/inventory?category=${encodeURIComponent(updatedDbProduct.category.name)}`);
+    if (updatedAppProduct.category) { // Use updatedAppProduct which is correctly typed
+        revalidatePath(`/inventory?category=${encodeURIComponent(updatedAppProduct.category.name)}`);
     }
-    return mapPrismaProductToAppProduct(updatedDbProduct);
+    return updatedAppProduct; // Return the already mapped product
   } catch (error) {
     console.error('Failed to decrease product stock action:', error);
     if (error instanceof Error) {
@@ -217,17 +224,18 @@ export async function increaseProductStockAction(
 ): Promise<Product> {
   try {
     if (quantityToIncrease <= 0) throw new Error("Quantity to increase must be positive.");
-    const updatedDbProduct = await logStockMovement(productId, movementType, quantityToIncrease, reason, referenceId, userId);
+    // logStockMovement already returns a mapped product
+    const updatedAppProduct = await logStockMovement(productId, movementType, quantityToIncrease, reason, referenceId, userId);
 
     revalidatePath('/inventory');
     revalidatePath(`/inventory/${productId}`);
     revalidatePath('/purchasing'); 
     revalidatePath('/admin/products');
     revalidatePath(`/inventory/${productId}/history`);
-     if (updatedDbProduct.category) {
-        revalidatePath(`/inventory?category=${encodeURIComponent(updatedDbProduct.category.name)}`);
+     if (updatedAppProduct.category) { // Use updatedAppProduct
+        revalidatePath(`/inventory?category=${encodeURIComponent(updatedAppProduct.category.name)}`);
     }
-    return mapPrismaProductToAppProduct(updatedDbProduct);
+    return updatedAppProduct; // Return the already mapped product
   } catch (error) {
     console.error('Failed to increase product stock action:', error);
     if (error instanceof Error) {
@@ -270,7 +278,7 @@ export async function fetchStockMovementsByProductId(productId: string): Promise
         role: m.user.role,
         avatarUrl: m.user.avatarUrl,
         isActive: m.user.isActive,
-        lastLogin: m.user.lastLogin?.toISOString(),
+        lastLogin: m.user.lastLogin?.toISOString() || null,
         createdAt: m.user.createdAt.toISOString(),
         updatedAt: m.user.updatedAt.toISOString(),
       } : undefined,

@@ -2,13 +2,14 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import type { Customer, Sale, CartItem, SaleDataForCreation, Product, User, StockMovementTypeEnum } from '@/lib/types'; 
+import type { Customer, Sale, CartItem, SaleDataForCreation, Product, User, StockMovementTypeEnum, Category } from '@/lib/types'; 
 import { revalidatePath } from 'next/cache';
 import { decreaseProductStockAction } from '@/app/inventory/actions';
 
-const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer => {
+const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer | null => {
+  if (!dbCustomer) return null;
   return {
-    ...dbCustomer,
+    ...dbCustomer, // Spreads all fields including id, name, email, phone
     createdAt: dbCustomer.createdAt.toISOString(),
     updatedAt: dbCustomer.updatedAt.toISOString(),
   };
@@ -17,41 +18,82 @@ const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer => {
 const mapPrismaUserToAppUser = (prismaUser: any): User | undefined => {
   if (!prismaUser) return undefined;
   return {
-    ...prismaUser,
+    id: prismaUser.id,
+    name: prismaUser.name,
+    email: prismaUser.email,
     role: prismaUser.role,
-    lastLogin: prismaUser.lastLogin?.toISOString() || null,
+    avatarUrl: prismaUser.avatarUrl ?? undefined,
+    isActive: prismaUser.isActive,
+    lastLogin: prismaUser.lastLogin?.toISOString() ?? null,
     createdAt: prismaUser.createdAt.toISOString(),
     updatedAt: prismaUser.updatedAt.toISOString(),
   };
 };
 
+// Local product mapper to avoid import issues and ensure correct Decimal conversion
+const mapPrismaProductToAppProductLocal = (prismaProduct: any): Product => {
+  if (!prismaProduct) return undefined as unknown as Product;
+  return {
+    id: prismaProduct.id,
+    name: prismaProduct.name,
+    sku: prismaProduct.sku,
+    quantity: prismaProduct.quantity,
+    price: prismaProduct.price ? prismaProduct.price.toNumber() : 0,
+    costPrice: prismaProduct.costPrice ? prismaProduct.costPrice.toNumber() : null,
+    supplier: prismaProduct.supplier ?? undefined,
+    description: prismaProduct.description ?? undefined,
+    imageUrl: prismaProduct.imageUrl ?? undefined,
+    lowStockThreshold: prismaProduct.lowStockThreshold ?? undefined,
+    tags: prismaProduct.tags ? JSON.parse(prismaProduct.tags as string) : [],
+    categoryId: prismaProduct.categoryId,
+    category: prismaProduct.category ? {
+        id: prismaProduct.category.id,
+        name: prismaProduct.category.name,
+        createdAt: prismaProduct.category.createdAt.toISOString(),
+        updatedAt: prismaProduct.category.updatedAt.toISOString(),
+    } : null,
+    createdAt: prismaProduct.createdAt.toISOString(),
+    updatedAt: prismaProduct.updatedAt.toISOString(),
+  };
+};
+
+
 const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
     return {
-      ...dbSale,
+      id: dbSale.id,
+      saleNumber: dbSale.saleNumber,
       saleDate: dbSale.saleDate.toISOString(),
+      customerId: dbSale.customerId,
+      customerName: dbSale.customerName,
+      userId: dbSale.userId,
+      // Convert Decimal fields to numbers
+      subtotal: dbSale.subtotal.toNumber(),
+      discountAmount: dbSale.discountAmount.toNumber(),
+      taxPercent: dbSale.taxPercent.toNumber(), 
+      taxAmount: dbSale.taxAmount.toNumber(),
+      shippingCost: dbSale.shippingCost.toNumber(),
+      grandTotal: dbSale.grandTotal.toNumber(),
+      paymentMethod: dbSale.paymentMethod,
+      status: dbSale.status,
+      notes: dbSale.notes,
       createdAt: dbSale.createdAt.toISOString(),
       updatedAt: dbSale.updatedAt.toISOString(),
       items: dbSale.items.map((item: any) => ({
-        ...item,
-        costPriceAtSale: item.costPriceAtSale !== null ? parseFloat(item.costPriceAtSale) : null,
-        unitPrice: parseFloat(item.unitPrice),
-        totalPrice: parseFloat(item.totalPrice),
-        product: item.product ? {
-            ...item.product,
-            price: parseFloat(item.product.price),
-            costPrice: item.product.costPrice !== null ? parseFloat(item.product.costPrice) : null,
-        } : undefined,
+        id: item.id,
+        saleId: item.saleId,
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        // Convert Decimal fields to numbers
+        unitPrice: item.unitPrice.toNumber(),
+        totalPrice: item.totalPrice.toNumber(),
+        costPriceAtSale: item.costPriceAtSale ? item.costPriceAtSale.toNumber() : null,
+        product: item.product ? mapPrismaProductToAppProductLocal(item.product) : undefined,
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),
       })),
-      customer: dbSale.customer ? mapPrismaCustomerToAppCustomer(dbSale.customer) : null,
+      customer: mapPrismaCustomerToAppCustomer(dbSale.customer),
       user: mapPrismaUserToAppUser(dbSale.user),
-      subtotal: parseFloat(dbSale.subtotal),
-      discountAmount: parseFloat(dbSale.discountAmount),
-      taxPercent: parseFloat(dbSale.taxPercent),
-      taxAmount: parseFloat(dbSale.taxAmount),
-      shippingCost: parseFloat(dbSale.shippingCost),
-      grandTotal: parseFloat(dbSale.grandTotal),
     };
   };
 
@@ -71,7 +113,9 @@ export async function findOrCreateCustomer(
             data: { name: guestName },
             });
         }
-        return mapPrismaCustomerToAppCustomer(customer);
+        const mappedCustomer = mapPrismaCustomerToAppCustomer(customer);
+        if (!mappedCustomer) throw new Error("Failed to map guest customer."); // Should not happen
+        return mappedCustomer;
     }
 
     let customer;
@@ -92,11 +136,13 @@ export async function findOrCreateCustomer(
         data: {
           name,
           email: email || null, 
-          phone,
+          phone: phone || null, // ensure phone is string or null
         },
       });
     }
-    return mapPrismaCustomerToAppCustomer(customer);
+    const mappedCustomer = mapPrismaCustomerToAppCustomer(customer);
+    if (!mappedCustomer) throw new Error("Failed to map customer."); // Should not happen
+    return mappedCustomer;
   } catch (error) {
     console.error('Failed to find or create customer:', error);
     throw new Error('Could not find or create customer.');
@@ -173,25 +219,23 @@ export async function recordSale(
         },
       },
       include: { 
-          items: { include: { product: true } }, 
+          items: { include: { product: {include: {category: true} } } }, 
           customer: true,
           user: true 
         },
     });
 
-    // Decrease stock and log movement for each item
     for (const item of createdSale.items) {
       await decreaseProductStockAction(
         item.productId, 
         item.quantity,
-        'SALE', // StockMovementTypeEnum.SALE,
+        'SALE', 
         `Sale #${createdSale.saleNumber}`,
         createdSale.id,
-        userId || undefined // Pass userId if available
+        userId || undefined 
       );
     }
     
-    // Revalidation paths (can be outside transaction if preferred, but fine here)
     revalidatePath('/pos');
     revalidatePath('/sales/history'); 
     cartItems.forEach(item => {
@@ -204,7 +248,7 @@ export async function recordSale(
   }).catch(error => {
     console.error('Failed to record sale transaction:', error);
     if (error instanceof Error && error.message.startsWith("Not enough stock for")) {
-        throw error; // Re-throw specific stock error to be caught by UI
+        throw error; 
     }
     if (error instanceof Error && (error as any).code === 'P2002' && (error as any).meta?.target?.includes('saleNumber')) {
          console.error('Sale number collision, this should be very rare.');
@@ -213,3 +257,4 @@ export async function recordSale(
     throw new Error('Could not record sale.');
   });
 }
+

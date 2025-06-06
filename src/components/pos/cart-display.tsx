@@ -7,16 +7,24 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2 } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2, User as UserIcon, Percent, Truck, Tag as DiscountIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useState } from 'react';
 
 export function CartDisplay() {
-  const { items, removeItem, updateItemQuantity, clearCart, totalItems, totalPrice } = useCartStore();
-  const { decreaseStock, products: inventoryProducts, getProductById } = useInventoryStore();
+  const { 
+    items, removeItem, updateItemQuantity, clearCart, totalItems, 
+    subtotal, grandTotal,
+    discountAmount, setDiscountAmount,
+    taxPercent, setTaxPercent,
+    shippingCost, setShippingCost
+  } = useCartStore();
+  const { decreaseStock, getProductById } = useInventoryStore();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [customerName, setCustomerName] = useState('');
 
   const handleQuantityChange = (productId: string, currentQuantity: number, change: number) => {
     const newQuantity = currentQuantity + change;
@@ -33,7 +41,6 @@ export function CartDisplay() {
 
     setIsCheckingOut(true);
 
-    // Check stock availability before proceeding
     for (const item of items) {
       const productInInventory = getProductById(item.productId);
       if (!productInInventory || productInInventory.quantity < item.quantity) {
@@ -43,19 +50,18 @@ export function CartDisplay() {
       }
     }
     
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate payment
 
     try {
-      // Decrease stock for each item
       for (const item of items) {
         await decreaseStock(item.productId, item.quantity);
       }
 
       toast.success("Checkout successful!", {
-          description: `Total: $${(totalPrice() * 1.10).toFixed(2)} for ${totalItems()} items.` // Assuming 10% tax
+          description: `${customerName ? `Customer: ${customerName}. ` : ''}Total: $${grandTotal().toFixed(2)} for ${totalItems()} items.`
       });
       clearCart();
+      setCustomerName('');
     } catch (error) {
         toast.error("An error occurred during checkout. Please try again.");
         console.error("Checkout error:", error);
@@ -63,6 +69,10 @@ export function CartDisplay() {
         setIsCheckingOut(false);
     }
   };
+
+  const currentSubtotal = subtotal();
+  const currentTaxAmount = (Math.max(0, currentSubtotal - discountAmount)) * (taxPercent / 100);
+  const currentGrandTotal = grandTotal();
 
   return (
     <Card className="flex flex-col h-full shadow-lg">
@@ -73,6 +83,21 @@ export function CartDisplay() {
         </CardTitle>
         <CardDescription>Review items and complete the transaction.</CardDescription>
       </CardHeader>
+      
+      <div className="p-4 border-b space-y-3">
+        <div>
+          <Label htmlFor="customerName" className="text-xs font-medium flex items-center gap-1 mb-1"><UserIcon className="h-3 w-3" />Customer Name (Optional)</Label>
+          <Input 
+            id="customerName" 
+            placeholder="Enter customer name" 
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            disabled={isCheckingOut}
+            className="h-9"
+          />
+        </div>
+      </div>
+
       <ScrollArea className="flex-1">
         <CardContent className="p-0">
           {items.length === 0 ? (
@@ -128,27 +153,81 @@ export function CartDisplay() {
           )}
         </CardContent>
       </ScrollArea>
+      
       {items.length > 0 && (
         <CardFooter className="flex flex-col gap-3 p-4 border-t mt-auto">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 w-full text-sm">
+            <div>
+              <Label htmlFor="discountAmount" className="text-xs flex items-center gap-1 mb-1"><DiscountIcon className="h-3 w-3"/>Discount ($)</Label>
+              <Input 
+                id="discountAmount" 
+                type="number" 
+                placeholder="0.00" 
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                disabled={isCheckingOut}
+                className="h-8"
+              />
+            </div>
+             <div>
+              <Label htmlFor="taxPercent" className="text-xs flex items-center gap-1 mb-1"><Percent className="h-3 w-3"/>Tax (%)</Label>
+              <Input 
+                id="taxPercent" 
+                type="number" 
+                placeholder="0" 
+                value={taxPercent}
+                onChange={(e) => setTaxPercent(parseFloat(e.target.value) || 0)}
+                disabled={isCheckingOut}
+                className="h-8"
+              />
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="shippingCost" className="text-xs flex items-center gap-1 mb-1"><Truck className="h-3 w-3"/>Shipping Cost ($)</Label>
+              <Input 
+                id="shippingCost" 
+                type="number" 
+                placeholder="0.00" 
+                value={shippingCost}
+                onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
+                disabled={isCheckingOut}
+                className="h-8"
+              />
+            </div>
+          </div>
+
+          <Separator className="my-2"/>
+
           <div className="w-full flex justify-between text-sm">
             <span>Subtotal</span>
-            <span>${totalPrice().toFixed(2)}</span>
+            <span>${currentSubtotal.toFixed(2)}</span>
           </div>
+          {discountAmount > 0 && (
+            <div className="w-full flex justify-between text-sm text-green-600">
+              <span>Discount</span>
+              <span>-${discountAmount.toFixed(2)}</span>
+            </div>
+          )}
           <div className="w-full flex justify-between text-sm">
-            <span>Tax (e.g. 10%)</span>
-            <span>${(totalPrice() * 0.10).toFixed(2)}</span>
+            <span>Tax ({taxPercent.toFixed(1)}%)</span>
+            <span>${currentTaxAmount.toFixed(2)}</span>
           </div>
+          {shippingCost > 0 && (
+            <div className="w-full flex justify-between text-sm">
+              <span>Shipping</span>
+              <span>${shippingCost.toFixed(2)}</span>
+            </div>
+          )}
           <Separator />
           <div className="w-full flex justify-between text-lg font-bold font-headline">
             <span>Total</span>
-            <span>${(totalPrice() * 1.10).toFixed(2)}</span>
+            <span>${currentGrandTotal.toFixed(2)}</span>
           </div>
           <Button size="lg" className="w-full mt-2" onClick={handleCheckout} disabled={isCheckingOut}>
             {isCheckingOut ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
             {isCheckingOut ? 'Processing...' : 'Proceed to Payment'}
           </Button>
-          <Button variant="outline" className="w-full" onClick={clearCart} disabled={isCheckingOut}>
-            Clear Cart
+          <Button variant="outline" className="w-full" onClick={() => { clearCart(); setCustomerName('');}} disabled={isCheckingOut}>
+            Clear Cart & Form
           </Button>
         </CardFooter>
       )}

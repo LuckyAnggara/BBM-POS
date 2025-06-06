@@ -1,19 +1,30 @@
+
 import { create } from 'zustand';
 import type { CartItem, Product } from '@/lib/types';
 import { toast } from 'sonner';
 
 interface CartState {
   items: CartItem[];
+  discountAmount: number;
+  taxPercent: number; // Stored as a whole number, e.g., 10 for 10%
+  shippingCost: number;
   addItem: (product: Product, quantity?: number) => void;
   removeItem: (productId: string) => void;
   updateItemQuantity: (productId: string, quantity: number) => void;
+  setDiscountAmount: (amount: number) => void;
+  setTaxPercent: (percent: number) => void;
+  setShippingCost: (cost: number) => void;
   clearCart: () => void;
   totalItems: () => number;
-  totalPrice: () => number;
+  subtotal: () => number;
+  grandTotal: () => number;
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
+  discountAmount: 0,
+  taxPercent: 0,
+  shippingCost: 0,
   addItem: (product, quantity = 1) => {
     set(state => {
       const existingItem = state.items.find(item => item.productId === product.id);
@@ -69,14 +80,29 @@ export const useCartStore = create<CartState>((set, get) => ({
       };
     });
   },
+  setDiscountAmount: (amount) => set({ discountAmount: Math.max(0, amount) }),
+  setTaxPercent: (percent) => set({ taxPercent: Math.max(0, percent) }),
+  setShippingCost: (cost) => set({ shippingCost: Math.max(0, cost) }),
   clearCart: () => {
-    set({ items: [] });
+    set({ items: [], discountAmount: 0, taxPercent: 0, shippingCost: 0 });
     toast.info('Cart cleared.');
   },
   totalItems: () => {
     return get().items.reduce((total, item) => total + item.quantity, 0);
   },
-  totalPrice: () => {
+  subtotal: () => {
     return get().items.reduce((total, item) => total + item.price * item.quantity, 0);
   },
+  grandTotal: () => {
+    const currentSubtotal = get().subtotal();
+    const currentDiscount = get().discountAmount;
+    const currentTaxPercent = get().taxPercent;
+    const currentShippingCost = get().shippingCost;
+
+    const taxableAmount = Math.max(0, currentSubtotal - currentDiscount);
+    const taxAmountValue = taxableAmount * (currentTaxPercent / 100);
+    
+    return Math.max(0, currentSubtotal - currentDiscount + taxAmountValue + currentShippingCost);
+  },
 }));
+

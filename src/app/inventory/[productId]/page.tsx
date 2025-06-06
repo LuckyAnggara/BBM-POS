@@ -131,12 +131,12 @@ export default function ProductDetailPage() {
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1 flex items-center"><DollarSign className="h-4 w-4 mr-2"/>Pricing</h3>
                   <p className="text-sm">Selling Price: <span className="font-semibold">${product.price.toFixed(2)}</span></p>
-                  {product.costPrice !== undefined && <p className="text-sm">Cost Price: <span className="font-semibold">${product.costPrice.toFixed(2)}</span></p>}
+                  {product.costPrice !== undefined && product.costPrice !== null && <p className="text-sm">Cost Price: <span className="font-semibold">${product.costPrice.toFixed(2)}</span></p>}
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1 flex items-center"><Package className="h-4 w-4 mr-2"/>Stock</h3>
-                  <p className="text-sm">Quantity: <Badge variant={product.quantity < (product.lowStockThreshold || 10) ? "destructive" : "default"}>{product.quantity}</Badge></p>
-                  {product.lowStockThreshold !== undefined && <p className="text-sm">Low Stock Threshold: {product.lowStockThreshold}</p>}
+                  <div className="text-sm">Quantity: <Badge variant={product.quantity < (product.lowStockThreshold || 10) ? "destructive" : "default"}>{product.quantity}</Badge></div>
+                  {product.lowStockThreshold !== undefined && product.lowStockThreshold !== null && <p className="text-sm">Low Stock Threshold: {product.lowStockThreshold}</p>}
                 </div>
                 {product.supplier && (
                   <div>

@@ -5,34 +5,44 @@ import { Decimal } from '@prisma/client/runtime/library';
 const prisma = new PrismaClient();
 
 async function seedUsers() {
+  // IMPORTANT: In a real application, passwords MUST be hashed using a strong algorithm like bcrypt or argon2.
+  // Storing plain text passwords is a major security vulnerability.
+  const adminPassword = "password123"; // Plain text for demo only
+  const staffPassword = "staffpass";   // Plain text for demo only
+
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
     update: {
-      // Ensure fields are updated if user exists but ID needs to conform
-      name: 'Admin User Alice', // Consistent name
+      name: 'Admin User Alice',
       role: 'ADMIN',
+      // password: adminPassword, // Update password if user exists, for demo purposes
     },
     create: {
-      id: 'user_admin_alice', // Explicitly set ID
+      id: 'user_admin_alice',
       name: 'Admin User Alice',
       email: 'admin@example.com',
+      password: adminPassword, // Storing plain text: NOT FOR PRODUCTION
       role: 'ADMIN',
       isActive: true,
+      avatarUrl: 'https://placehold.co/80x80/7F56D9/FFFFFF.png?text=AA'
     },
   });
 
   const staff = await prisma.user.upsert({
     where: { email: 'staff@example.com' },
     update: {
-      name: 'Staff User Charlie', // Consistent name
+      name: 'Staff User Charlie',
       role: 'STAFF',
+      // password: staffPassword, // Update password if user exists, for demo purposes
     },
     create: {
-      id: 'user_staff_charlie', // Explicitly set ID
+      id: 'user_staff_charlie',
       name: 'Staff User Charlie',
       email: 'staff@example.com',
+      password: staffPassword, // Storing plain text: NOT FOR PRODUCTION
       role: 'STAFF',
       isActive: true,
+      avatarUrl: 'https://placehold.co/80x80/64748B/FFFFFF.png?text=SC'
     },
   });
 
@@ -119,7 +129,7 @@ async function seedPurchaseOrders(users: Record<string, User>, products: Record<
       orderDate: new Date(),
       status: 'Ordered',
       totalAmount: new Decimal(300),
-      createdById: users.admin.id, // Use the seeded admin's actual ID
+      createdById: users.admin.id,
       items: {
         create: [{
           productId: products.product1.id,
@@ -154,7 +164,7 @@ async function seedSales(users: Record<string, User>, products: Record<string, P
       saleDate: new Date(),
       customerId: customer.id,
       customerName: customer.name,
-      userId: users.staff.id, // Use the seeded staff's actual ID
+      userId: users.staff.id,
       subtotal: new Decimal(31.98),
       discountAmount: new Decimal(0),
       taxPercent: new Decimal(10),
@@ -185,7 +195,6 @@ async function seedStockMovements(
   purchaseOrders: Record<string, PurchaseOrder>,
   sales: Record<string, Sale>
 ) {
-  // Clear existing stock movements for idempotency if re-running seed for these specific test movements
   await prisma.stockMovement.deleteMany({
     where: {
       OR: [
@@ -201,8 +210,8 @@ async function seedStockMovements(
         productId: products.product1.id,
         type: 'PURCHASE_RECEIPT',
         quantityChange: 30,
-        quantityBefore: 50, // Assuming product1 starts at 50 before this PO receipt
-        quantityAfter: 80,  // 50 + 30
+        quantityBefore: 50,
+        quantityAfter: 80,
         reason: `PO #${purchaseOrders.po.poNumber} Received`,
         referenceId: purchaseOrders.po.id,
         userId: users.admin.id,
@@ -211,8 +220,8 @@ async function seedStockMovements(
         productId: products.product1.id,
         type: 'SALE',
         quantityChange: -2,
-        quantityBefore: 80, // After PO receipt
-        quantityAfter: 78,  // 80 - 2
+        quantityBefore: 80,
+        quantityAfter: 78,
         reason: `Sale #${sales.sale.saleNumber}`,
         referenceId: sales.sale.id,
         userId: users.staff.id,
@@ -226,7 +235,7 @@ async function main() {
 
   await prisma.appSettings.upsert({
     where: { id: 'main_settings' },
-    update: {}, // Define any updates if necessary
+    update: {},
     create: {
       id: 'main_settings',
       appName: 'StockPilot',
@@ -236,30 +245,23 @@ async function main() {
       emailNotifications: true,
       lowStockAlerts: true,
       newOrderAlerts: false,
-      defaultTaxRate: 7.5, // Example default tax rate
+      defaultTaxRate: 7.5,
     },
   });
 
   const users = await seedUsers();
   const categories = await seedCategories();
-  const products = await seedProducts(categories);
-  const purchaseOrders = await seedPurchaseOrders(users, products);
-  const sales = await seedSales(users, products);
+  const productsData = await seedProducts(categories);
   
-  // It's important that stock levels are consistent before running seedStockMovements.
-  // This example assumes product1.quantity (50) is its state *before* the PO receipt and sale.
-  // If seedProducts itself sets quantity based on some logic, ensure quantityBefore is accurate.
-  // For simplicity, we'll assume the product quantities from seedProducts are their initial state.
-  // The stock movements here will reflect changes from that initial state.
-  
-  // Let's ensure product1's quantity is set to its starting point before these specific movements are logged.
-  // This makes the seed more idempotent for the stock movement part.
+  // Ensure product1's quantity is reset before specific PO/Sale stock movements for idempotency
   await prisma.product.update({
-    where: { id: products.product1.id },
-    data: { quantity: 50 } // Resetting to initial quantity for reliable movement calculation
+    where: { id: productsData.product1.id },
+    data: { quantity: 50 } 
   });
-
-  await seedStockMovements(users, products, purchaseOrders, sales);
+  
+  const purchaseOrders = await seedPurchaseOrders(users, productsData);
+  const sales = await seedSales(users, productsData);
+  await seedStockMovements(users, productsData, purchaseOrders, sales);
 
   console.log('✅ Seeding finished.');
 }

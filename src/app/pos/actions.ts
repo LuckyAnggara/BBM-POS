@@ -2,14 +2,15 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import type { Customer, Sale, CartItem, SaleDataForCreation, Product, User, StockMovementTypeEnum, Category } from '@/lib/types'; 
+import type { Customer, Sale, CartItem, SaleDataForCreation, Product, User, StockMovementTypeEnum, Category } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 import { decreaseProductStockAction } from '@/app/inventory/actions';
+import { getSession } from '@/lib/auth-utils'; // Import getSession
 
 const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer | null => {
   if (!dbCustomer) return null;
   return {
-    ...dbCustomer, // Spreads all fields including id, name, email, phone
+    ...dbCustomer,
     createdAt: dbCustomer.createdAt.toISOString(),
     updatedAt: dbCustomer.updatedAt.toISOString(),
   };
@@ -30,7 +31,6 @@ const mapPrismaUserToAppUser = (prismaUser: any): User | undefined => {
   };
 };
 
-// Local product mapper to avoid import issues and ensure correct Decimal conversion
 const mapPrismaProductToAppProductLocal = (prismaProduct: any): Product => {
   if (!prismaProduct) return undefined as unknown as Product;
   return {
@@ -66,10 +66,9 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
       customerId: dbSale.customerId,
       customerName: dbSale.customerName,
       userId: dbSale.userId,
-      // Convert Decimal fields to numbers
       subtotal: dbSale.subtotal.toNumber(),
       discountAmount: dbSale.discountAmount.toNumber(),
-      taxPercent: dbSale.taxPercent.toNumber(), 
+      taxPercent: dbSale.taxPercent.toNumber(),
       taxAmount: dbSale.taxAmount.toNumber(),
       shippingCost: dbSale.shippingCost.toNumber(),
       grandTotal: dbSale.grandTotal.toNumber(),
@@ -84,7 +83,6 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
         productId: item.productId,
         productName: item.productName,
         quantity: item.quantity,
-        // Convert Decimal fields to numbers
         unitPrice: item.unitPrice.toNumber(),
         totalPrice: item.totalPrice.toNumber(),
         costPriceAtSale: item.costPriceAtSale ? item.costPriceAtSale.toNumber() : null,
@@ -106,7 +104,7 @@ export async function findOrCreateCustomer(
     if (!name.trim()) {
         const guestName = "Guest Customer";
         let customer = await prisma.customer.findFirst({
-            where: { name: guestName, email: null, phone: null }, 
+            where: { name: guestName, email: null, phone: null },
         });
         if (!customer) {
             customer = await prisma.customer.create({
@@ -114,7 +112,7 @@ export async function findOrCreateCustomer(
             });
         }
         const mappedCustomer = mapPrismaCustomerToAppCustomer(customer);
-        if (!mappedCustomer) throw new Error("Failed to map guest customer."); // Should not happen
+        if (!mappedCustomer) throw new Error("Failed to map guest customer.");
         return mappedCustomer;
     }
 
@@ -125,23 +123,23 @@ export async function findOrCreateCustomer(
       });
     }
 
-    if (!customer && name) { 
+    if (!customer && name) {
       customer = await prisma.customer.findFirst({
-        where: { name }, 
+        where: { name },
       });
     }
-    
+
     if (!customer) {
       customer = await prisma.customer.create({
         data: {
           name,
-          email: email || null, 
-          phone: phone || null, // ensure phone is string or null
+          email: email || null,
+          phone: phone || null,
         },
       });
     }
     const mappedCustomer = mapPrismaCustomerToAppCustomer(customer);
-    if (!mappedCustomer) throw new Error("Failed to map customer."); // Should not happen
+    if (!mappedCustomer) throw new Error("Failed to map customer.");
     return mappedCustomer;
   } catch (error) {
     console.error('Failed to find or create customer:', error);
@@ -162,12 +160,19 @@ function generateSaleNumber(): string {
 }
 
 export async function recordSale(
-  saleData: SaleDataForCreation,
+  // userId is removed from parameters, will be fetched from session
+  saleData: Omit<SaleDataForCreation, 'userId'>,
 ): Promise<Sale> {
+  const session = await getSession();
+  if (!session?.user?.id) {
+    throw new Error("User not authenticated or session invalid.");
+  }
+  const userId = session.user.id;
+
   return await prisma.$transaction(async (tx) => {
-    const { 
-        cartItems, customerId, userId, 
-        subtotal, discountAmount = 0, taxPercent = 0, shippingCost = 0, 
+    const {
+        cartItems, customerId,
+        subtotal, discountAmount = 0, taxPercent = 0, shippingCost = 0,
         customerName, paymentMethod, status = "Completed"
     } = saleData;
 
@@ -187,9 +192,9 @@ export async function recordSale(
 
     const saleItemsData = cartItems.map((item: CartItem) => ({
       productId: item.productId,
-      productName: item.name, 
+      productName: item.name,
       quantity: item.quantity,
-      unitPrice: item.price, 
+      unitPrice: item.price,
       totalPrice: item.price * item.quantity,
       costPriceAtSale: productMap.get(item.productId)?.costPrice ?? item.costPrice ?? null,
     }));
@@ -209,35 +214,35 @@ export async function recordSale(
         taxAmount: taxAmountValue,
         shippingCost,
         grandTotal: grandTotalValue,
-        customerName: customerName, 
+        customerName: customerName,
         paymentMethod,
         status,
-        ...(customerId && { customerId: customerId }), 
-        userId,
+        ...(customerId && { customerId: customerId }),
+        userId, // Use userId from session
         items: {
           create: saleItemsData,
         },
       },
-      include: { 
-          items: { include: { product: {include: {category: true} } } }, 
+      include: {
+          items: { include: { product: {include: {category: true} } } },
           customer: true,
-          user: true 
+          user: true
         },
     });
 
     for (const item of createdSale.items) {
       await decreaseProductStockAction(
-        item.productId, 
+        item.productId,
         item.quantity,
-        'SALE', 
+        'SALE',
         `Sale #${createdSale.saleNumber}`,
         createdSale.id,
-        userId || undefined 
+        userId // Pass userId from session to stock action
       );
     }
-    
+
     revalidatePath('/pos');
-    revalidatePath('/sales/history'); 
+    revalidatePath('/sales/history');
     cartItems.forEach(item => {
         revalidatePath(`/inventory/${item.productId}`);
         revalidatePath(`/inventory/${item.productId}/history`);
@@ -248,7 +253,7 @@ export async function recordSale(
   }).catch(error => {
     console.error('Failed to record sale transaction:', error);
     if (error instanceof Error && error.message.startsWith("Not enough stock for")) {
-        throw error; 
+        throw error;
     }
     if (error instanceof Error && (error as any).code === 'P2002' && (error as any).meta?.target?.includes('saleNumber')) {
          console.error('Sale number collision, this should be very rare.');
@@ -257,4 +262,3 @@ export async function recordSale(
     throw new Error('Could not record sale.');
   });
 }
-

@@ -1,10 +1,13 @@
 
-'use server'; // Still useful here as it's a server-side utility that uses server-only functions
+'use server';
 
 import { cookies } from 'next/headers';
-import type { User } from '@/lib/types'; // Ensure this path is correct
+import type { User } from '@/lib/types';
 
-export async function getSession(): Promise<{ user: User; session: string } | null> {
+// Renamed return type for clarity if needed, or keep as is if User type is directly stored
+interface SessionPayload extends User {}
+
+export async function getSession(): Promise<{ user: SessionPayload; session: string } | null> {
   const cookieStore = cookies();
   const sessionCookie = cookieStore.get('auth_session');
 
@@ -12,13 +15,13 @@ export async function getSession(): Promise<{ user: User; session: string } | nu
     return null;
   }
   try {
-    // Assuming the session cookie directly stores the JSON string of the User object
-    const parsedSession = JSON.parse(sessionCookie.value) as User; 
+    // Assuming the session cookie directly stores the JSON string of the User object (or SessionPayload)
+    const parsedSession = JSON.parse(sessionCookie.value) as SessionPayload;
     return { user: parsedSession, session: sessionCookie.value };
   } catch (error) {
     console.error('Failed to parse session cookie:', error);
     // Optionally, delete the malformed cookie
-    // cookieStore.delete('auth_session'); 
+    // cookieStore.delete('auth_session');
     return null;
   }
 }

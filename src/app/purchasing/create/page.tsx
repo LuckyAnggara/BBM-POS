@@ -28,23 +28,21 @@ import {
 } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { useInventoryStore } from '@/store/inventory-store';
-import type { Product, PurchaseOrder, PurchaseOrderStatus } from '@/lib/types'; // Ensure PurchaseOrderStatus is imported
-// Removed mockPurchaseOrders import as we use DB now
+import type { Product, PurchaseOrder, PurchaseOrderStatus } from '@/lib/types';
 import { toast } from 'sonner';
 import { Save, ArrowLeft, PlusCircle, Trash2, CalendarIcon, Loader2, ChevronsUpDown, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
-import { createPurchaseOrder } from '../actions'; // Import server action
+import { createPurchaseOrder } from '../actions';
 
-// This schema should be consistent with the edit page, including status if needed for create, though status is often default.
 const purchaseOrderItemSchema = z.object({
   productId: z.string().min(1, "Product selection is required"),
-  productName: z.string(), 
+  productName: z.string(),
   quantityOrdered: z.coerce.number().int().min(1, "Quantity must be at least 1"),
   unitCost: z.coerce.number().min(0, "Unit cost must be non-negative"),
-  quantityReceived: z.coerce.number().int().min(0).optional().nullable(), // Added for consistency with edit
+  quantityReceived: z.coerce.number().int().min(0).optional().nullable(),
 });
 
 export type PurchaseOrderItemFormValues = z.infer<typeof purchaseOrderItemSchema>;
@@ -53,13 +51,13 @@ const purchaseOrderSchema = z.object({
   poNumber: z.string().min(1, "PO Number is required (e.g., PO-YYYY-####)"),
   supplierName: z.string().min(1, "Supplier name is required"),
   orderDate: z.date({ required_error: "Order date is required." }),
-  expectedDeliveryDate: z.date().optional(),
+  expectedDeliveryDate: z.date().optional().nullable(), // Made nullable for optional
   items: z.array(purchaseOrderItemSchema).min(1, "At least one item is required in the purchase order."),
   discountAmount: z.coerce.number().min(0, "Discount must be non-negative").optional().or(z.literal('')),
   shippingCost: z.coerce.number().min(0, "Shipping cost must be non-negative").optional().or(z.literal('')),
   taxes: z.coerce.number().min(0, "Taxes must be non-negative").optional().or(z.literal('')),
   notes: z.string().optional(),
-  status: z.custom<PurchaseOrderStatus>().optional(), // Status is usually defaulted on create
+  status: z.custom<PurchaseOrderStatus>().optional(),
 });
 
 export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
@@ -77,7 +75,7 @@ export default function CreatePurchaseOrderPage() {
   const form = useForm<PurchaseOrderFormValues>({
     resolver: zodResolver(purchaseOrderSchema),
     defaultValues: {
-      poNumber: `PO-${new Date().getFullYear()}-${String(Math.floor(Math.random()*10000)).padStart(4, '0')}`, // Generate a somewhat unique PO
+      poNumber: `PO-${new Date().getFullYear()}-${String(Math.floor(Math.random()*10000)).padStart(4, '0')}`,
       supplierName: '',
       orderDate: new Date(),
       expectedDeliveryDate: undefined,
@@ -86,7 +84,7 @@ export default function CreatePurchaseOrderPage() {
       shippingCost: '',
       taxes: '',
       notes: '',
-      status: 'Draft', // Default status
+      status: 'Draft',
     },
   });
 
@@ -98,7 +96,7 @@ export default function CreatePurchaseOrderPage() {
   useEffect(() => {
     setComboboxOpenStates(fields.map(() => false));
   }, [fields.length]);
-  
+
   const setComboboxState = (index: number, isOpen: boolean) => {
     setComboboxOpenStates(prev => prev.map((state, i) => (i === index ? isOpen : state)));
   };
@@ -107,14 +105,12 @@ export default function CreatePurchaseOrderPage() {
     return items.reduce((sum, item) => sum + ((item.quantityOrdered || 0) * (item.unitCost || 0)), 0);
   };
 
-  // Placeholder for user ID - in a real app, this would come from auth state
-  const MOCK_USER_ID = "user_admin_alice"; 
-
+  // MOCK_USER_ID is no longer needed here, action will get user from session
   const onSubmit = async (data: PurchaseOrderFormValues) => {
     setIsSubmitting(true);
     try {
-      // createdById would come from authentication in a real app
-      await createPurchaseOrder(data, MOCK_USER_ID); 
+      // Pass only 'data' to createPurchaseOrder, as createdById is handled by the action
+      await createPurchaseOrder(data);
       toast.success('Purchase Order created successfully!');
       router.push('/purchasing');
     } catch (error) {
@@ -124,7 +120,7 @@ export default function CreatePurchaseOrderPage() {
       setIsSubmitting(false);
     }
   };
-  
+
   const watchedItems = form.watch("items");
   const watchedDiscountAmount = form.watch("discountAmount");
   const watchedShippingCost = form.watch("shippingCost");
@@ -292,7 +288,7 @@ export default function CreatePurchaseOrderPage() {
                                         if (product.costPrice) {
                                           form.setValue(`items.${index}.unitCost`, product.costPrice);
                                         } else {
-                                          form.setValue(`items.${index}.unitCost`, 0); 
+                                          form.setValue(`items.${index}.unitCost`, 0);
                                         }
                                         setComboboxState(index, false);
                                       }}
@@ -372,7 +368,7 @@ export default function CreatePurchaseOrderPage() {
               >
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Item
               </Button>
-              {form.formState.errors.items && !form.formState.errors.items.length && (
+              {form.formState.errors.items && !Array.isArray(form.formState.errors.items) && form.formState.errors.items.message && (
                  <p className="text-sm font-medium text-destructive">{form.formState.errors.items.message}</p>
               )}
             </CardContent>

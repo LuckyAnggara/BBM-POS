@@ -2,7 +2,7 @@
 'use client';
 import { useCartStore } from '@/store/cart-store';
 import { useInventoryStore } from '@/store/inventory-store';
-import type { CartItem, SaleDataForCreation, Customer, StockMovementTypeEnum } from '@/lib/types';
+import type { CartItem, SaleDataForCreation, Customer } from '@/lib/types'; // Removed StockMovementTypeEnum as it's not directly used here
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
@@ -18,20 +18,20 @@ import { fetchAppSettings } from '@/app/admin/settings/actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
 
-const MOCK_USER_ID = 'user_staff_charlie'; 
+// MOCK_USER_ID is no longer needed here as server action will get user from session.
 
 export function CartDisplay() {
-  const { 
-    items, removeItem, updateItemQuantity, clearCart, totalItems, 
+  const {
+    items, removeItem, updateItemQuantity, clearCart, totalItems,
     subtotal, grandTotal,
     discountAmount, setDiscountAmount,
     taxPercent, setTaxPercent,
     shippingCost, setShippingCost,
     paymentMethod, setPaymentMethod
   } = useCartStore();
-  const { decreaseStock, getProductById } = useInventoryStore(); // decreaseStock is now more general
+  const { getProductById } = useInventoryStore(); // decreaseStock is now handled by recordSale server action
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  const [customerName, setCustomerName] = useState(''); 
+  const [customerName, setCustomerName] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
@@ -40,7 +40,7 @@ export function CartDisplay() {
       setIsLoadingSettings(true);
       try {
         const settings = await fetchAppSettings();
-        setTaxPercent(settings.defaultTaxRate); 
+        setTaxPercent(settings.defaultTaxRate);
       } catch (error) {
         console.error("Failed to load app settings for POS:", error);
         toast.error("Could not load tax settings.");
@@ -54,11 +54,11 @@ export function CartDisplay() {
 
   const handleQuantityChange = (productId: string, currentQuantity: number, change: number) => {
     const newQuantity = currentQuantity + change;
-    if (newQuantity >= 0) { 
+    if (newQuantity >= 0) {
       updateItemQuantity(productId, newQuantity);
     }
   };
-  
+
   const handleCheckout = async () => {
     if (items.length === 0) {
       toast.error("Your cart is empty. Please add items to proceed.");
@@ -66,8 +66,6 @@ export function CartDisplay() {
     }
     setIsCheckingOut(true);
 
-    // Server-side stock check is now part of recordSale transaction
-    // Client-side pre-check is still good for UX
     for (const item of items) {
       const productInInventory = getProductById(item.productId);
       if (!productInInventory || productInInventory.quantity < item.quantity) {
@@ -78,8 +76,8 @@ export function CartDisplay() {
     }
 
     let foundCustomer: Customer | null = null;
-    
-    if (customerName.trim()) { 
+
+    if (customerName.trim()) {
       try {
         foundCustomer = await findOrCreateCustomer(customerName.trim());
       } catch (error) {
@@ -90,20 +88,19 @@ export function CartDisplay() {
       }
     }
     const currentSubtotalVal = subtotal();
-    const saleDataPayload: SaleDataForCreation = {
-      userId: MOCK_USER_ID, 
+    // Remove userId from payload, server action gets it from session
+    const saleDataPayload: Omit<SaleDataForCreation, 'userId'> = {
       cartItems: items,
       subtotal: currentSubtotalVal,
       discountAmount,
-      taxPercent, 
+      taxPercent,
       shippingCost,
-      customerName: customerName.trim() || undefined, 
+      customerName: customerName.trim() || undefined,
       customerId: foundCustomer?.id || undefined,
       paymentMethod: paymentMethod,
     };
     try {
       const recordedSale = await recordSale(saleDataPayload);
-      // Stock decrease and movement logging now handled by recordSale -> decreaseProductStockAction
 
       toast.success("Sale " + recordedSale.saleNumber + " successful!", {
           description: (customerName ? "Customer: " + customerName + ". " : '') + "Total: $" + recordedSale.grandTotal.toFixed(2) + " for " + totalItems() + " items."
@@ -113,7 +110,7 @@ export function CartDisplay() {
       setPromoCode('');
     } catch (error) {
         if (error instanceof Error) {
-            toast.error(error.message); // Show specific error from server action
+            toast.error(error.message);
         } else {
             toast.error("An error occurred during checkout. Please try again.");
         }
@@ -125,7 +122,7 @@ export function CartDisplay() {
 
   const currentSubtotal = subtotal();
   const taxableAmount = Math.max(0, currentSubtotal - discountAmount);
-  const currentTaxAmount = taxableAmount * (taxPercent / 100); 
+  const currentTaxAmount = taxableAmount * (taxPercent / 100);
   const currentGrandTotal = grandTotal();
 
   return (
@@ -148,7 +145,7 @@ export function CartDisplay() {
             </div>
         </div>
       </CardHeader>
-      
+
       <ScrollArea className="flex-1">
         <CardContent className="p-0">
           {items.length === 0 ? (
@@ -166,7 +163,7 @@ export function CartDisplay() {
                   <Image
                     src={item.imageUrl || "https://placehold.co/48x48.png"}
                     alt={item.name}
-                    width={48} 
+                    width={48}
                     height={48}
                     className="rounded border object-cover"
                     data-ai-hint="product thumbnail"
@@ -203,13 +200,13 @@ export function CartDisplay() {
             </ul>
         </CardContent>
       </ScrollArea>
-      
+
       {items.length > 0 && (
         <CardFooter className="flex flex-col gap-2.5 p-3 border-t mt-auto">
-          <Input 
-            id="customerName" 
-            type="text" 
-            placeholder="Customer Name (Optional)" 
+          <Input
+            id="customerName"
+            type="text"
+            placeholder="Customer Name (Optional)"
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
             disabled={isCheckingOut}
@@ -218,10 +215,10 @@ export function CartDisplay() {
           <div className="grid grid-cols-2 gap-2 w-full">
             <div className="space-y-0.5">
               <Label htmlFor="discountAmount" className="text-xs">Discount ($)</Label>
-              <Input 
-                id="discountAmount" 
-                type="number" 
-                placeholder="0.00" 
+              <Input
+                id="discountAmount"
+                type="number"
+                placeholder="0.00"
                 value={discountAmount}
                 onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
                 disabled={isCheckingOut}
@@ -230,10 +227,10 @@ export function CartDisplay() {
             </div>
             <div className="space-y-0.5">
                 <Label htmlFor="shippingCost" className="text-xs">Shipping ($)</Label>
-                <Input 
-                    id="shippingCost" 
-                    type="number" 
-                    placeholder="0.00" 
+                <Input
+                    id="shippingCost"
+                    type="number"
+                    placeholder="0.00"
                     value={shippingCost}
                     onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
                     disabled={isCheckingOut}
@@ -241,7 +238,7 @@ export function CartDisplay() {
                 />
             </div>
           </div>
-          
+
           <p className="text-xs font-medium self-start mt-1">Payment Details</p>
           <div className="w-full flex justify-between text-xs">
             <span className="text-muted-foreground">Sub Totals</span>
@@ -268,10 +265,10 @@ export function CartDisplay() {
           </div>
 
           <div className="flex w-full gap-2">
-            <Input 
-                id="promoCode" 
-                type="text" 
-                placeholder="Promo code" 
+            <Input
+                id="promoCode"
+                type="text"
+                placeholder="Promo code"
                 value={promoCode}
                 onChange={(e) => setPromoCode(e.target.value)}
                 disabled={isCheckingOut}
@@ -287,7 +284,7 @@ export function CartDisplay() {
             <SelectContent>
                 <SelectItem value="Cash">
                     <div className="flex items-center gap-2 text-xs">
-                        <DollarSign className="h-3.5 w-3.5"/> 
+                        <DollarSign className="h-3.5 w-3.5"/>
                         Cash
                     </div>
                 </SelectItem>

@@ -17,7 +17,7 @@ import {
   SidebarMenuSubButton,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarGroupContent, // Ensure this is imported
+  SidebarGroupContent,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -25,29 +25,30 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ChevronDown, LogOut, Building, Settings, Power } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { sidebarNavGroups, standaloneNavItems, type NavItem, type NavSubItem } from './nav-items';
-import { logoutUser } from '@/app/auth/actions'; // Import the server action
+import { sidebarNavGroups, standaloneNavItems, type NavItem } from './nav-items';
+import { logoutUser } from '@/app/auth/actions';
+import type { User } from '@/lib/types'; // Import User type
 
 interface AppShellProps {
   children: ReactNode;
+  user: User; // Add user prop
 }
 
 const NavItemRenderer = ({ item, pathname }: { item: NavItem; pathname: string }) => {
   const isRouteCurrentlyActive = item.isActive ? item.isActive(pathname) : (item.href && pathname.startsWith(item.href) && (item.href === '/' ? pathname === '/' : true));
-  
-  const initialOpenState = item.subItems && item.subItems.length > 0 
-    ? (item.isInitiallyOpen || isRouteCurrentlyActive) 
+
+  const initialOpenState = item.subItems && item.subItems.length > 0
+    ? (item.isInitiallyOpen || isRouteCurrentlyActive)
     : false;
   const [isOpen, setIsOpen] = React.useState(initialOpenState);
 
   React.useEffect(() => {
     if (item.subItems && item.subItems.length > 0) {
       const newOpenState = item.isInitiallyOpen || (item.isActive ? item.isActive(pathname) : false);
-      if (newOpenState && !isOpen && isRouteCurrentlyActive) { 
+      if (newOpenState && !isOpen && isRouteCurrentlyActive) {
          setIsOpen(true);
       } else if (!newOpenState && isOpen && !isRouteCurrentlyActive && !item.isInitiallyOpen) {
          // Optional: auto-close if route is no longer active and not set to be initially open
-         // setIsOpen(false); 
       }
     }
   }, [pathname, item, isOpen, isRouteCurrentlyActive]);
@@ -60,8 +61,8 @@ const NavItemRenderer = ({ item, pathname }: { item: NavItem; pathname: string }
 
   if (item.subItems && item.subItems.length > 0) {
     return (
-      <SidebarMenuItem 
-        key={item.label} 
+      <SidebarMenuItem
+        key={item.label}
         className="relative"
         data-state={isOpen ? 'open' : 'closed'}
       >
@@ -116,14 +117,13 @@ const NavItemRenderer = ({ item, pathname }: { item: NavItem; pathname: string }
 };
 
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, user }: AppShellProps) { // Accept user prop
   const pathname = usePathname();
-  // If on login page, don't render AppShell, or render minimal version
-  // This logic is now handled by middleware redirecting to /login,
-  // so AppShell should only render for authenticated routes.
-  // If you want /login to have a different layout, it should not use this AppShell.
-  // We can achieve this by making login page its own root layout or by conditional rendering here.
-  // For now, assuming middleware protects AppShell routes.
+
+  const getInitials = (name: string) => {
+    if (!name) return '';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  }
 
   return (
     <SidebarProvider defaultOpen>
@@ -139,7 +139,7 @@ export function AppShell({ children }: AppShellProps) {
             </div>
           </Link>
         </SidebarHeader>
-        
+
         <SidebarContent className="flex-1 p-0">
           {sidebarNavGroups.map((group) => (
             <SidebarGroup key={group.groupTitle} className="pt-3 pb-1 px-2">
@@ -163,16 +163,16 @@ export function AppShell({ children }: AppShellProps) {
             </>
           )}
         </SidebarContent>
-        
+
         <SidebarFooter className="p-3 border-t border-sidebar-border">
            <div className="flex items-center gap-2.5 mb-2">
             <Avatar className="h-8 w-8">
-              <AvatarImage src="https://placehold.co/80x80/7F56D9/FFFFFF.png?text=AU" alt="Admin User" data-ai-hint="user initial" />
-              <AvatarFallback>AU</AvatarFallback>
+              <AvatarImage src={user.avatarUrl || undefined} alt={user.name} data-ai-hint="user initial" />
+              <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-              <span className="text-sm font-medium text-sidebar-foreground leading-tight">Admin User</span> {/* Placeholder, update with real user data later */}
-              <span className="text-xs text-sidebar-foreground/70 leading-tight">admin@stockpilot.com</span>
+              <span className="text-sm font-medium text-sidebar-foreground leading-tight">{user.name}</span>
+              <span className="text-xs text-sidebar-foreground/70 leading-tight">{user.email}</span>
             </div>
             <Button variant="ghost" size="icon" className="ml-auto text-sidebar-foreground/70 hover:text-sidebar-foreground group-data-[collapsible=icon]:hidden" asChild>
                 <Link href="/admin/settings"><Settings className="h-4 w-4" /></Link>
@@ -190,11 +190,10 @@ export function AppShell({ children }: AppShellProps) {
           </form>
         </SidebarFooter>
       </Sidebar>
-      
+
       <SidebarInset className="flex flex-col">
         <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background/80 px-6 backdrop-blur-sm">
           <SidebarTrigger />
-          {/* Future: Breadcrumbs or page title can go here */}
         </header>
         <main className="flex-1 overflow-auto p-6">
           {children}

@@ -22,7 +22,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const router = useRouter();
+  const router = useRouter(); // Keep router for other potential uses, though not for this specific redirect
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -41,8 +41,10 @@ export default function LoginPage() {
         const result = await loginUser(data);
         if (result.success) {
           toast.success('Login berhasil!');
-          router.push('/'); // Redirect to dashboard
-          router.refresh(); // Refresh to ensure layout picks up new auth state
+          // Use window.location.assign for a full page redirect
+          // This ensures the new session cookie is sent with the request to the server
+          // and RootLayout can correctly determine the auth state.
+          window.location.assign('/'); 
         } else {
           setError(result.error || 'Email atau password salah.');
           toast.error(result.error || 'Email atau password salah.');

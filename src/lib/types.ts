@@ -1,5 +1,6 @@
 
-import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, AppSettings as PrismaAppSettings, Customer as PrismaCustomer, Sale as PrismaSale, SaleItem as PrismaSaleItem, Category as PrismaCategory, StockMovement as PrismaStockMovement, StockMovementType as PrismaStockMovementType } from '@prisma/client';
+import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, AppSettings as PrismaAppSettings, Customer as PrismaCustomer, Sale as PrismaSale, SaleItem as PrismaSaleItem, Category as PrismaCategory, StockMovement as PrismaStockMovement } from '@prisma/client';
+import { StockMovementType as PrismaClientStockMovementType } from '@prisma/client'; // Import enum as value (and type)
 
 export interface Category extends Omit<PrismaCategory, 'createdAt' | 'updatedAt'> {
   createdAt: string; // ISO date string
@@ -137,8 +138,9 @@ export type SaleDataForCreation = Omit<Sale, 'id' | 'saleNumber' | 'createdAt' |
 };
 
 // Stock Movement Types
-export type StockMovementType = PrismaStockMovementType;
-export const StockMovementTypeEnum = PrismaStockMovementType;
+// Use the imported PrismaClientStockMovementType for both the type and the enum value
+export type StockMovementType = PrismaClientStockMovementType;
+export const StockMovementTypeEnum = PrismaClientStockMovementType;
 
 
 export interface StockMovement extends Omit<PrismaStockMovement, 'createdAt' | 'product' | 'user' | 'type'> {

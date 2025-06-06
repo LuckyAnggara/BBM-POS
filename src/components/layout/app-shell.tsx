@@ -27,7 +27,7 @@ import { usePathname } from 'next/navigation';
 import { TeamSwitcher } from './team-switcher';
 import { NavUser } from './nav-user';
 import type { User } from '@/lib/types';
-import { sidebarNavGroups, standaloneNavItems, type NavItem, type NavSubItem } from './nav-items'; // Import nav items configuration
+import { sidebarNavGroups, standaloneNavItems, type NavItem, type NavSubItem } from './nav-items.tsx'; // Import nav items configuration, ensure .tsx
 
 interface AppShellProps {
   children: ReactNode;

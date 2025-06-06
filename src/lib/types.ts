@@ -1,5 +1,5 @@
 
-import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, AppSettings as PrismaAppSettings, Customer as PrismaCustomer, Sale as PrismaSale, SaleItem as PrismaSaleItem, Category as PrismaCategory } from '@prisma/client';
+import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, AppSettings as PrismaAppSettings, Customer as PrismaCustomer, Sale as PrismaSale, SaleItem as PrismaSaleItem, Category as PrismaCategory, StockMovement as PrismaStockMovement, StockMovementType as PrismaStockMovementType } from '@prisma/client';
 
 export interface Category extends Omit<PrismaCategory, 'createdAt' | 'updatedAt'> {
   createdAt: string; // ISO date string
@@ -132,6 +132,18 @@ export type SaleDataForCreation = Omit<Sale, 'id' | 'saleNumber' | 'createdAt' |
   customerId?: string; 
   userId: string; 
   cartItems: CartItem[]; 
-  paymentMethod: string; // Made non-optional as it's collected from POS
-  status?: string; // Optional for creation, defaults in action
+  paymentMethod: string; 
+  status?: string; 
 };
+
+// Stock Movement Types
+export type StockMovementType = PrismaStockMovementType;
+export const StockMovementTypeEnum = PrismaStockMovementType;
+
+
+export interface StockMovement extends Omit<PrismaStockMovement, 'createdAt' | 'product' | 'user' | 'type'> {
+  type: StockMovementType;
+  product?: Product; // Optional for display
+  user?: User;       // Optional for display
+  createdAt: string; // ISO date string
+}

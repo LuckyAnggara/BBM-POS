@@ -2,8 +2,9 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import type { Customer, Sale, CartItem, SaleDataForCreation, Product } from '@/lib/types'; 
+import type { Customer, Sale, CartItem, SaleDataForCreation, Product, User, StockMovementTypeEnum } from '@/lib/types'; 
 import { revalidatePath } from 'next/cache';
+import { decreaseProductStockAction } from '@/app/inventory/actions';
 
 const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer => {
   return {
@@ -13,7 +14,8 @@ const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer => {
   };
 };
 
-const mapPrismaUserToAppUser = (prismaUser: any): User => {
+const mapPrismaUserToAppUser = (prismaUser: any): User | undefined => {
+  if (!prismaUser) return undefined;
   return {
     ...prismaUser,
     role: prismaUser.role,
@@ -43,7 +45,7 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
         updatedAt: item.updatedAt.toISOString(),
       })),
       customer: dbSale.customer ? mapPrismaCustomerToAppCustomer(dbSale.customer) : null,
-      user: dbSale.user ? mapPrismaUserToAppUser(dbSale.user) : undefined,
+      user: mapPrismaUserToAppUser(dbSale.user),
       subtotal: parseFloat(dbSale.subtotal),
       discountAmount: parseFloat(dbSale.discountAmount),
       taxPercent: parseFloat(dbSale.taxPercent),
@@ -79,7 +81,7 @@ export async function findOrCreateCustomer(
       });
     }
 
-    if (!customer && name) { // Ensure name is not empty if email wasn't found/provided
+    if (!customer && name) { 
       customer = await prisma.customer.findFirst({
         where: { name }, 
       });
@@ -116,20 +118,26 @@ function generateSaleNumber(): string {
 export async function recordSale(
   saleData: SaleDataForCreation,
 ): Promise<Sale> {
-  try {
+  return await prisma.$transaction(async (tx) => {
     const { 
         cartItems, customerId, userId, 
         subtotal, discountAmount = 0, taxPercent = 0, shippingCost = 0, 
-        customerName, paymentMethod, status = "Completed" // Default status
+        customerName, paymentMethod, status = "Completed"
     } = saleData;
 
-    // Fetch cost prices for all products in the cart
     const productIds = cartItems.map(item => item.productId);
-    const productsInDb = await prisma.product.findMany({
+    const productsInDb = await tx.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, costPrice: true },
+      select: { id: true, costPrice: true, name: true, quantity: true },
     });
-    const costPriceMap = new Map(productsInDb.map(p => [p.id, p.costPrice]));
+    const productMap = new Map(productsInDb.map(p => [p.id, p]));
+
+    for (const item of cartItems) {
+      const productInfo = productMap.get(item.productId);
+      if (!productInfo || productInfo.quantity < item.quantity) {
+        throw new Error(`Not enough stock for ${productInfo?.name || item.name}. Available: ${productInfo?.quantity || 0}`);
+      }
+    }
 
     const saleItemsData = cartItems.map((item: CartItem) => ({
       productId: item.productId,
@@ -137,7 +145,7 @@ export async function recordSale(
       quantity: item.quantity,
       unitPrice: item.price, 
       totalPrice: item.price * item.quantity,
-      costPriceAtSale: costPriceMap.get(item.productId) ?? item.costPrice ?? null, // Use fetched cost price, fallback to cartItem's costPrice if available (e.g. if cart store pre-fetches)
+      costPriceAtSale: productMap.get(item.productId)?.costPrice ?? item.costPrice ?? null,
     }));
 
     const taxableAmount = Math.max(0, subtotal - discountAmount);
@@ -145,7 +153,7 @@ export async function recordSale(
     const grandTotalValue = Math.max(0, subtotal - discountAmount + taxAmountValue + shippingCost);
     const saleNumber = generateSaleNumber();
 
-    const createdSale = await prisma.sale.create({
+    const createdSale = await tx.sale.create({
       data: {
         saleNumber,
         saleDate: new Date(),
@@ -171,22 +179,37 @@ export async function recordSale(
         },
     });
 
+    // Decrease stock and log movement for each item
+    for (const item of createdSale.items) {
+      await decreaseProductStockAction(
+        item.productId, 
+        item.quantity,
+        'SALE', // StockMovementTypeEnum.SALE,
+        `Sale #${createdSale.saleNumber}`,
+        createdSale.id,
+        userId || undefined // Pass userId if available
+      );
+    }
+    
+    // Revalidation paths (can be outside transaction if preferred, but fine here)
     revalidatePath('/pos');
-    revalidatePath('/sales/history'); // Revalidate sales history page
+    revalidatePath('/sales/history'); 
     cartItems.forEach(item => {
         revalidatePath(`/inventory/${item.productId}`);
+        revalidatePath(`/inventory/${item.productId}/history`);
     });
     revalidatePath('/inventory');
 
     return mapPrismaSaleToAppSale(createdSale);
-  } catch (error) {
-    console.error('Failed to record sale:', error);
-    if (error instanceof Error) {
-        if ((error as any).code === 'P2002' && (error as any).meta?.target?.includes('saleNumber')) {
-             console.error('Sale number collision, this should be very rare.');
-             throw new Error('Failed to generate a unique sale number. Please try again.');
-        }
+  }).catch(error => {
+    console.error('Failed to record sale transaction:', error);
+    if (error instanceof Error && error.message.startsWith("Not enough stock for")) {
+        throw error; // Re-throw specific stock error to be caught by UI
+    }
+    if (error instanceof Error && (error as any).code === 'P2002' && (error as any).meta?.target?.includes('saleNumber')) {
+         console.error('Sale number collision, this should be very rare.');
+         throw new Error('Failed to generate a unique sale number. Please try again.');
     }
     throw new Error('Could not record sale.');
-  }
+  });
 }

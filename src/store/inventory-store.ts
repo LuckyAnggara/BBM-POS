@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import type { Product } from '@/lib/types';
+import type { Product, StockMovementType } from '@/lib/types'; // Added StockMovementType
 import { toast } from 'sonner';
 import { 
   fetchAllProductsAction,
@@ -20,8 +20,24 @@ interface InventoryState {
   addProduct: (productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Product | null>;
   updateProduct: (productId: string, updatedProductData: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<Product | null>;
   deleteProduct: (productId: string) => Promise<void>;
-  decreaseStock: (productId: string, quantityToDecrease: number) => Promise<void>;
-  increaseStock: (productId: string, quantityToIncrease: number) => Promise<void>;
+  // These direct stock manipulation functions might be deprecated in favor of actions that also handle movement logging
+  // For now, they call the enhanced server actions.
+  decreaseStock: (
+    productId: string, 
+    quantityToDecrease: number, 
+    movementType: StockMovementType, 
+    reason?: string, 
+    referenceId?: string, 
+    userId?: string
+  ) => Promise<void>;
+  increaseStock: (
+    productId: string, 
+    quantityToIncrease: number,
+    movementType: StockMovementType,
+    reason?: string,
+    referenceId?: string,
+    userId?: string
+  ) => Promise<void>;
 }
 
 export const useInventoryStore = create<InventoryState>((set, get) => ({
@@ -44,14 +60,9 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     return get().products.find(p => p.id === productId);
   },
   addProduct: async (productData) => {
-    // Optimistic UI update can be complex with server actions if ID is server-generated
-    // For now, we'll wait for server response then refresh.
-    // For a smoother UX, consider generating a temporary client-side ID or handling server response more granularly.
     set({ isLoading: true });
     try {
       const newAppProduct = await createProductAction(productData);
-      // Instead of manually adding, refetch or update based on response for consistency
-      // For simplicity here, we'll update the local store directly if successful
       set(state => ({ 
         products: [...state.products, newAppProduct].sort((a,b) => a.name.localeCompare(b.name)), 
         isLoading: false 
@@ -103,29 +114,31 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
       toast.error('Failed to delete product.');
     }
   },
-  decreaseStock: async (productId, quantityToDecrease) => {
+  // Updated to call the server action which handles logging
+  decreaseStock: async (productId, quantityToDecrease, movementType, reason, referenceId, userId) => {
     try {
-      const updatedAppProduct = await decreaseProductStockAction(productId, quantityToDecrease);
+      const updatedAppProduct = await decreaseProductStockAction(productId, quantityToDecrease, movementType, reason, referenceId, userId);
       set(state => ({
         products: state.products.map(p => (p.id === productId ? updatedAppProduct : p)),
       }));
     } catch (err) {
-      console.error("Failed to decrease stock:", err);
-      toast.error('Failed to update stock.');
-       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
-       set(state => ({ ...state, error: errorMessage }));
+      console.error("Failed to decrease stock in store:", err);
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
+      toast.error(errorMessage); // Show specific error from action if available
+      set(state => ({ ...state, error: errorMessage }));
     }
   },
-  increaseStock: async (productId, quantityToIncrease) => {
+  // Updated to call the server action which handles logging
+  increaseStock: async (productId, quantityToIncrease, movementType, reason, referenceId, userId) => {
      try {
-      const updatedAppProduct = await increaseProductStockAction(productId, quantityToIncrease);
+      const updatedAppProduct = await increaseProductStockAction(productId, quantityToIncrease, movementType, reason, referenceId, userId);
       set(state => ({
         products: state.products.map(p => (p.id === productId ? updatedAppProduct : p)),
       }));
     } catch (err) {
-      console.error("Failed to increase stock:", err);
-      toast.error('Failed to update stock.');
+      console.error("Failed to increase stock in store:", err);
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
+      toast.error(errorMessage);
       set(state => ({...state, error: errorMessage }));
     }
   },

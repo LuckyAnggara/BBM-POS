@@ -2,17 +2,17 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import type { PurchaseOrder as AppPurchaseOrder, PurchaseOrderItem as AppPurchaseOrderItem, PurchaseOrderStatus } from '@/lib/types';
+import type { PurchaseOrder as AppPurchaseOrder, PurchaseOrderItem as AppPurchaseOrderItem, PurchaseOrderStatus, StockMovementTypeEnum } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import type { PurchaseOrderFormValues } from './create/page'; // Assuming types are similar for edit
+import type { PurchaseOrderFormValues } from './create/page'; 
+import { increaseProductStockAction } from '@/app/inventory/actions'; // Import for stock updates
 
-// Helper to map Prisma PO to App PO
 const mapPrismaPOToAppPO = (dbPO: any): AppPurchaseOrder => {
   return {
     ...dbPO,
     orderDate: dbPO.orderDate.toISOString(),
     expectedDeliveryDate: dbPO.expectedDeliveryDate?.toISOString() || null,
-    status: dbPO.status as PurchaseOrderStatus, // Status is now string
+    status: dbPO.status as PurchaseOrderStatus,
     createdAt: dbPO.createdAt.toISOString(),
     updatedAt: dbPO.updatedAt.toISOString(),
     items: dbPO.items.map((item: any) => ({
@@ -73,7 +73,7 @@ export async function createPurchaseOrder(data: PurchaseOrderFormValues, created
         supplierName,
         orderDate,
         expectedDeliveryDate,
-        status: status || 'Draft', // Default status if not provided, now a string
+        status: status || 'Draft',
         discountAmount: finalDiscount,
         shippingCost: finalShipping,
         taxes: finalTaxes,
@@ -123,7 +123,7 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
             quantityOrdered: item.quantityOrdered,
             unitCost: item.unitCost,
             totalCost: item.quantityOrdered * item.unitCost,
-            quantityReceived: item.quantityReceived ?? null,
+            quantityReceived: item.quantityReceived ?? null, // Use value from form
         }));
         
         const po = await tx.purchaseOrder.update({
@@ -133,7 +133,7 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
                 supplierName,
                 orderDate,
                 expectedDeliveryDate,
-                status: status as PurchaseOrderStatus, // Status from form, now a string
+                status: status as PurchaseOrderStatus,
                 discountAmount: finalDiscount,
                 shippingCost: finalShipping,
                 taxes: finalTaxes,
@@ -160,6 +160,8 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
 
 export async function deletePurchaseOrderById(id: string): Promise<void> {
   try {
+    // Also delete related POItems if not handled by onDelete: Cascade
+    await prisma.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: id } });
     await prisma.purchaseOrder.delete({
       where: { id },
     });
@@ -171,33 +173,59 @@ export async function deletePurchaseOrderById(id: string): Promise<void> {
 }
 
 export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrderStatus, itemsToReceive?: AppPurchaseOrderItem[]): Promise<AppPurchaseOrder> {
-  try {
-    const updateData: any = { status }; // status is now a string
-    if (status === 'Received' && itemsToReceive) {
-        for (const item of itemsToReceive) {
-             // Ensure item.id is valid and item exists before attempting update
-            if (item.id) {
-                await prisma.purchaseOrderItem.update({
-                    where: { id: item.id }, 
-                    data: { quantityReceived: item.quantityOrdered }
-                });
-            } else {
-                // This case should ideally not happen if itemsToReceive are from an existing PO
-                console.warn(`Item ${item.productName} is missing an ID, cannot update quantityReceived.`);
-            }
-        }
+  return await prisma.$transaction(async (tx) => {
+    const po = await tx.purchaseOrder.findUnique({
+      where: {id},
+      include: { items: true, createdBy: true}
+    });
+
+    if (!po) {
+      throw new Error(`Purchase Order with ID ${id} not found.`);
     }
 
-    const updatedDbPO = await prisma.purchaseOrder.update({
+    const updatedPo = await tx.purchaseOrder.update({
       where: { id },
-      data: updateData,
-      include: { items: {include: {product: true}}, createdBy: true },
+      data: { status },
+      include: { items: { include: { product: true } }, createdBy: true },
     });
+
+    if (status === 'Received' && itemsToReceive) {
+      for (const item of itemsToReceive) {
+        if (item.id) { // Ensure item.id is valid
+          // Update PurchaseOrderItem quantityReceived
+          await tx.purchaseOrderItem.update({
+            where: { id: item.id },
+            data: { quantityReceived: item.quantityOrdered } // Assuming full quantity received
+          });
+          
+          // Increase product stock and log movement
+          await increaseProductStockAction(
+            item.productId,
+            item.quantityOrdered, // Quantity to increase
+            'PURCHASE_RECEIPT', // StockMovementTypeEnum.PURCHASE_RECEIPT
+            `Received from PO #${po.poNumber}`,
+            po.id,
+            po.createdById // User who created the PO, or a dedicated receiving user if applicable
+          );
+        } else {
+          console.warn(`Item ${item.productName} is missing an ID, cannot update quantityReceived or stock.`);
+        }
+      }
+    }
+    
     revalidatePath('/purchasing');
     revalidatePath(`/purchasing/${id}`);
-    return mapPrismaPOToAppPO(updatedDbPO);
-  } catch (error) {
-    console.error(`Failed to update status for PO ${id}:`, error);
-    throw new Error('Could not update PO status.');
-  }
+    if (status === 'Received' && itemsToReceive) {
+        itemsToReceive.forEach(item => {
+            revalidatePath(`/inventory/${item.productId}`);
+            revalidatePath(`/inventory/${item.productId}/history`);
+        });
+        revalidatePath('/inventory');
+    }
+
+    return mapPrismaPOToAppPO(updatedPo);
+  }).catch(error => {
+      console.error(`Failed to update status for PO ${id}:`, error);
+      throw new Error('Could not update PO status.');
+  });
 }

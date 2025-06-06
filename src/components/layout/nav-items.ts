@@ -15,12 +15,12 @@ import {
   Plane,
   MoreHorizontal,
   Star,
-  History,
+  History as HistoryIcon, // Renamed to avoid conflict with browser History
   HelpCircle,
   FolderKanban,
   SlidersHorizontal,
-  DollarSign, // For Sales
-  TrendingUp // For Reports
+  DollarSign, 
+  TrendingUp 
 } from 'lucide-react';
 
 export interface NavSubItem {
@@ -56,16 +56,19 @@ export const sidebarNavGroups: NavGroup[] = [
       },
       {
         label: 'Inventory Models',
-        icon: FolderKanban, // Using FolderKanban for "Inventory" like group
-        isInitiallyOpen: false,
+        icon: FolderKanban, 
+        isInitiallyOpen: false, // Keep this closed initially or based on path
         subItems: [
           {
             href: '/inventory',
             label: 'All Products',
             icon: Package,
-            isActive: (pathname) => pathname === '/inventory' || pathname.startsWith('/inventory/add') || /^\/inventory\/[^/]+(\/edit)?$/.test(pathname),
           },
+          // Example: Adding a sub-item for stock history if needed globally,
+          // but it's usually per product. So, a link on product detail is better.
+          // { href: '/inventory/global-stock-history', label: 'Global Stock Log', icon: HistoryIcon},
         ],
+        // This isActive should cover all sub-routes of inventory
         isActive: (pathname) => pathname.startsWith('/inventory'),
       },
       {
@@ -73,7 +76,7 @@ export const sidebarNavGroups: NavGroup[] = [
         icon: BarChart3, 
         isInitiallyOpen: false,
         subItems: [
-          { href: '/sales/history', label: 'Sales History', icon: History },
+          { href: '/sales/history', label: 'Sales History', icon: HistoryIcon },
           // { href: '/reports/profit-loss', label: 'Profit & Loss', icon: TrendingUp },
         ],
         isActive: (pathname) => pathname.startsWith('/sales') || pathname.startsWith('/reports'),
@@ -84,7 +87,7 @@ export const sidebarNavGroups: NavGroup[] = [
         href: '/admin/settings',
         isActive: (pathname) => pathname === '/admin/settings',
       },
-      { label: 'History', icon: History, href: '#history-placeholder' },
+      { label: 'History (General)', icon: HistoryIcon, href: '#history-placeholder' },
       { label: 'Starred', icon: Star, href: '#starred-placeholder' },
       { label: 'Documentation', icon: HelpCircle, href: '#docs-placeholder' },
     ],
@@ -93,7 +96,7 @@ export const sidebarNavGroups: NavGroup[] = [
     groupTitle: 'Projects', 
     items: [
       { label: 'Design Engineering', icon: PenTool, href: '#design-placeholder' },
-      { label: 'Sales & Marketing', icon: BarChart3, href: '#sales-market-placeholder' }, // Made unique
+      { label: 'Sales & Marketing', icon: BarChart3, href: '#sales-market-placeholder' },
       { label: 'Travel', icon: Plane, href: '#travel-placeholder' },
       { label: 'More', icon: MoreHorizontal, href: '#more-projects-placeholder' },
     ],

@@ -1,5 +1,5 @@
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, StockMovementType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -7,6 +7,7 @@ async function main() {
   console.log(`Start seeding ...`);
 
   // Clear existing data in reverse order of dependency
+  await prisma.stockMovement.deleteMany(); // Clear stock movements first
   await prisma.saleItem.deleteMany();
   await prisma.sale.deleteMany();
   await prisma.customer.deleteMany();
@@ -62,8 +63,19 @@ async function main() {
   for (const p of productsToCreate) {
     const product = await prisma.product.create({ data: p });
     createdProducts.push(product);
+    // Seed initial stock movement
+    await prisma.stockMovement.create({
+      data: {
+        productId: product.id,
+        type: StockMovementType.INITIAL_STOCK,
+        quantityChange: product.quantity,
+        quantityBefore: 0,
+        quantityAfter: product.quantity,
+        reason: 'Initial stock seeding',
+      }
+    });
   }
-  console.log(`Created ${createdProducts.length} products.`);
+  console.log(`Created ${createdProducts.length} products and their initial stock movements.`);
 
   // Seed Users
   const usersToCreate = [
@@ -93,57 +105,130 @@ async function main() {
 
   // Seed Purchase Orders
   const adminUser = createdUsers.find(u => u.role === "ADMIN");
-  if (adminUser && createdProducts.length > 1) {
-    await prisma.purchaseOrder.create({
+  const poProductApple = createdProducts.find(p => p.id === 'prod_apple');
+  if (adminUser && poProductApple && poProductApple.costPrice) {
+    const po = await prisma.purchaseOrder.create({
       data: {
-        poNumber: 'PO2024-0701-DB', supplierName: 'Fresh Farms Inc.', orderDate: new Date('2024-07-01T10:00:00Z'), expectedDeliveryDate: new Date('2024-07-05T10:00:00Z'), status: "Received", discountAmount: 0, shippingCost: 10.00, taxes: 5.00, totalAmount: (createdProducts[0].costPrice! * 20) + 10 + 5, notes: 'Urgent restock.', createdById: adminUser.id,
-        items: { create: [{ productId: createdProducts[0].id, productName: createdProducts[0].name, quantityOrdered: 20, unitCost: createdProducts[0].costPrice!, totalCost: createdProducts[0].costPrice! * 20, quantityReceived: 20 }] },
+        poNumber: 'PO2024-0701-DB', supplierName: 'Fresh Farms Inc.', orderDate: new Date('2024-07-01T10:00:00Z'), expectedDeliveryDate: new Date('2024-07-05T10:00:00Z'), status: "Received", discountAmount: 0, shippingCost: 10.00, taxes: 5.00, totalAmount: (poProductApple.costPrice * 20) + 10 + 5, notes: 'Urgent restock.', createdById: adminUser.id,
+        items: { create: [{ productId: poProductApple.id, productName: poProductApple.name, quantityOrdered: 20, unitCost: poProductApple.costPrice, totalCost: poProductApple.costPrice * 20, quantityReceived: 20 }] },
       },
     });
     console.log(`Created a purchase order.`);
+
+    // If PO status is Received, log stock movement
+    if (po.status === "Received") {
+      for (const item of po.items) {
+        const product = await prisma.product.findUnique({ where: { id: item.productId }});
+        if (product) {
+          const quantityBefore = product.quantity - item.quantityOrdered; // Assuming stock was not yet updated from this PO
+          await prisma.stockMovement.create({
+            data: {
+              productId: item.productId,
+              type: StockMovementType.PURCHASE_RECEIPT,
+              quantityChange: item.quantityOrdered,
+              quantityBefore: quantityBefore,
+              quantityAfter: product.quantity, // Current (already updated) product quantity
+              reason: `PO #${po.poNumber} received`,
+              referenceId: po.id,
+              userId: adminUser.id,
+            }
+          });
+          // Note: This assumes product.quantity was updated *before* this seed script runs for PO items.
+          // If not, the product.quantity needs to be updated first, then log movement.
+          // For simplicity in seed, we log based on current product quantity being the 'after' state.
+        }
+      }
+      console.log(`Logged stock movements for received PO.`);
+    }
   }
+
 
   // Seed Sales
   const staffUserCharlie = createdUsers.find(u => u.id === 'user_staff_charlie');
   const customerJohn = createdCustomers.find(c => c.id === 'cust_john_doe');
   const customerJane = createdCustomers.find(c => c.id === 'cust_jane_smith');
+  const prodApple = createdProducts.find(p => p.id === 'prod_apple');
+  const prodBread = createdProducts.find(p => p.id === 'prod_bread');
+  const prodEggs = createdProducts.find(p => p.id === 'prod_eggs');
+  const prodCoffee = createdProducts.find(p => p.id === 'prod_coffee');
 
-  if (staffUserCharlie && customerJohn && createdProducts.length >= 2) {
-    const sale1Subtotal = (createdProducts[0].price * 2) + (createdProducts[1].price * 1);
-    await prisma.sale.create({
+
+  if (staffUserCharlie && customerJohn && prodApple && prodBread) {
+    const sale1Subtotal = (prodApple.price * 2) + (prodBread.price * 1);
+    const sale1 = await prisma.sale.create({
       data: {
-        saleNumber: 'SALE-20240720-001', saleDate: new Date(Date.now() - 1000 * 60 * 60 * 48), // 2 days ago
+        saleNumber: 'SALE-20240720-001', saleDate: new Date(Date.now() - 1000 * 60 * 60 * 48), 
         customerId: customerJohn.id, customerName: customerJohn.name, userId: staffUserCharlie.id,
         subtotal: sale1Subtotal, discountAmount: 0, taxPercent: 10, taxAmount: sale1Subtotal * 0.10, shippingCost: 0, grandTotal: sale1Subtotal * 1.10,
         paymentMethod: 'Cash', status: 'Completed', notes: 'Customer paid in cash.',
         items: {
           create: [
-            { productId: createdProducts[0].id, productName: createdProducts[0].name, quantity: 2, unitPrice: createdProducts[0].price, totalPrice: createdProducts[0].price * 2, costPriceAtSale: createdProducts[0].costPrice },
-            { productId: createdProducts[1].id, productName: createdProducts[1].name, quantity: 1, unitPrice: createdProducts[1].price, totalPrice: createdProducts[1].price * 1, costPriceAtSale: createdProducts[1].costPrice },
+            { productId: prodApple.id, productName: prodApple.name, quantity: 2, unitPrice: prodApple.price, totalPrice: prodApple.price * 2, costPriceAtSale: prodApple.costPrice },
+            { productId: prodBread.id, productName: prodBread.name, quantity: 1, unitPrice: prodBread.price, totalPrice: prodBread.price * 1, costPriceAtSale: prodBread.costPrice },
           ]
         }
       }
     });
     console.log(`Created sale 1 for John Doe.`);
+    // Log stock movements for sale 1
+    for (const item of sale1.items) {
+        const product = await prisma.product.findUnique({ where: { id: item.productId }});
+        if (product) {
+             // Assuming product quantity is already reduced by the sale action in a real app
+            // For seed, we simulate it. The `quantityAfter` would be product.quantity (after reduction).
+            // `quantityBefore` is product.quantity + item.quantity (before reduction).
+            // This logic might differ slightly from runtime if decreaseProductStockAction updates and then logs.
+             await prisma.stockMovement.create({
+                data: {
+                    productId: item.productId,
+                    type: StockMovementType.SALE,
+                    quantityChange: -item.quantity,
+                    quantityBefore: product.quantity + item.quantity, // Approximate before state for seed
+                    quantityAfter: product.quantity, // Current state after sale
+                    reason: `Sale #${sale1.saleNumber}`,
+                    referenceId: sale1.id,
+                    userId: staffUserCharlie.id
+                }
+            });
+        }
+    }
   }
 
-  if (staffUserCharlie && customerJane && createdProducts.length >= 3) {
-     const sale2Subtotal = (createdProducts[2].price * 1) + (createdProducts[3].price * 1);
-    await prisma.sale.create({
+  if (staffUserCharlie && customerJane && prodEggs && prodCoffee) {
+     const sale2Subtotal = (prodEggs.price * 1) + (prodCoffee.price * 1);
+    const sale2 = await prisma.sale.create({
       data: {
-        saleNumber: 'SALE-20240721-002', saleDate: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
+        saleNumber: 'SALE-20240721-002', saleDate: new Date(Date.now() - 1000 * 60 * 60 * 24), 
         customerId: customerJane.id, customerName: customerJane.name, userId: staffUserCharlie.id,
         subtotal: sale2Subtotal, discountAmount: 1.00, taxPercent: 10, taxAmount: (sale2Subtotal - 1.00) * 0.10, shippingCost: 2.50, grandTotal: (sale2Subtotal - 1.00) * 1.10 + 2.50,
         paymentMethod: 'Credit Card', status: 'Completed', notes: 'Used promo code SUMMER10 (not implemented, just note)',
         items: {
           create: [
-            { productId: createdProducts[2].id, productName: createdProducts[2].name, quantity: 1, unitPrice: createdProducts[2].price, totalPrice: createdProducts[2].price * 1, costPriceAtSale: createdProducts[2].costPrice },
-            { productId: createdProducts[3].id, productName: createdProducts[3].name, quantity: 1, unitPrice: createdProducts[3].price, totalPrice: createdProducts[3].price * 1, costPriceAtSale: createdProducts[3].costPrice },
+            { productId: prodEggs.id, productName: prodEggs.name, quantity: 1, unitPrice: prodEggs.price, totalPrice: prodEggs.price * 1, costPriceAtSale: prodEggs.costPrice },
+            { productId: prodCoffee.id, productName: prodCoffee.name, quantity: 1, unitPrice: prodCoffee.price, totalPrice: prodCoffee.price * 1, costPriceAtSale: prodCoffee.costPrice },
           ]
         }
       }
     });
     console.log(`Created sale 2 for Jane Smith.`);
+    // Log stock movements for sale 2
+     for (const item of sale2.items) {
+        const product = await prisma.product.findUnique({ where: { id: item.productId }});
+        if (product) {
+             await prisma.stockMovement.create({
+                data: {
+                    productId: item.productId,
+                    type: StockMovementType.SALE,
+                    quantityChange: -item.quantity,
+                    quantityBefore: product.quantity + item.quantity,
+                    quantityAfter: product.quantity,
+                    reason: `Sale #${sale2.saleNumber}`,
+                    referenceId: sale2.id,
+                    userId: staffUserCharlie.id
+                }
+            });
+        }
+    }
   }
   
   console.log(`Seeding finished.`);

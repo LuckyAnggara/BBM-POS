@@ -2,10 +2,9 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import type { Product, Category } from '@/lib/types'; // Added Category type
+import type { Product, Category, StockMovementType } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
 
-// Helper to convert Prisma Product to App Product (handling tags JSON and category)
 const mapPrismaProductToAppProduct = (prismaProduct: any): Product => {
   return {
     ...prismaProduct,
@@ -15,7 +14,6 @@ const mapPrismaProductToAppProduct = (prismaProduct: any): Product => {
     imageUrl: prismaProduct.imageUrl ?? undefined,
     lowStockThreshold: prismaProduct.lowStockThreshold ?? undefined,
     tags: prismaProduct.tags ? JSON.parse(prismaProduct.tags as string) : [],
-    // category field is now an object if included, or just categoryId
     category: prismaProduct.category ? {
         id: prismaProduct.category.id,
         name: prismaProduct.category.name,
@@ -27,7 +25,6 @@ const mapPrismaProductToAppProduct = (prismaProduct: any): Product => {
   };
 };
 
-// Helper to map Prisma Category to App Category
 const mapPrismaCategoryToAppCategory = (dbCategory: any): Category => {
   return {
     ...dbCategory,
@@ -36,43 +33,41 @@ const mapPrismaCategoryToAppCategory = (dbCategory: any): Category => {
   };
 };
 
-
 export async function fetchAllProductsAction(includeCategory: boolean = true): Promise<Product[]> {
-  console.log('sukses')
-
   const dbProducts = await prisma.product.findMany({
-    include: { category: true,  },
+    include: { category: true },
+    orderBy: { name: 'asc' },
   });
-  console.log(JSON.stringify(dbProducts, null, 2)); 
   return dbProducts.map(mapPrismaProductToAppProduct);
-  // try {
-  //   const dbProducts = await prisma.product.findMany({
-  //     include: {
-  //       category: includeCategory, // Include category data based on 
-  //     },
-  //   });
-  //   console.log('Product', dbProducts)
-  //   return dbProducts.map(mapPrismaProductToAppProduct);
-  // }  catch (error) {
-  //   console.error('Failed to fetch products action:', error);
-  //   if (error instanceof Error) {
-  //     console.error('Stack trace:', error.stack);
-  //   }
-  //   throw new Error('Could not fetch products.');
-  // }
 }
 
 export async function createProductAction(productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'category'>): Promise<Product> {
   try {
-    const { tags, categoryId, ...restOfData } = productData;
+    const { tags, categoryId, quantity, ...restOfData } = productData;
     const newDbProduct = await prisma.product.create({
       data: {
         ...restOfData,
+        quantity,
         tags: tags ? JSON.stringify(tags) : JSON.stringify([]),
         ...(categoryId && { categoryId: categoryId }),
       },
       include: { category: true },
     });
+
+    // Log initial stock movement
+    if (quantity > 0) {
+      await prisma.stockMovement.create({
+        data: {
+          productId: newDbProduct.id,
+          type: 'INITIAL_STOCK',
+          quantityChange: quantity,
+          quantityBefore: 0,
+          quantityAfter: quantity,
+          reason: 'Initial stock for new product',
+        }
+      });
+    }
+
     revalidatePath('/inventory');
     revalidatePath('/admin/products');
     revalidatePath('/pos'); 
@@ -94,16 +89,16 @@ export async function updateProductAction(productId: string, updatedProductData:
     if (tags !== undefined) {
       dataToUpdate.tags = tags ? JSON.stringify(tags) : JSON.stringify([]);
     }
-    if (categoryId !== undefined) { // Handle empty string as null or disconnect
+    if (categoryId !== undefined) {
         dataToUpdate.categoryId = categoryId ? categoryId : null;
     }
-
 
     const updatedDbProduct = await prisma.product.update({
       where: { id: productId },
       data: dataToUpdate,
       include: { category: true },
     });
+
     revalidatePath('/inventory');
     revalidatePath(`/inventory/${productId}`);
     revalidatePath(`/inventory/${productId}/edit`);
@@ -121,8 +116,10 @@ export async function updateProductAction(productId: string, updatedProductData:
 
 export async function deleteProductAction(productId: string): Promise<void> {
   try {
-    // Optionally, find the product first to revalidate its category path
     const product = await prisma.product.findUnique({ where: { id: productId }, include: { category: true } });
+    // Add cascading delete for stock movements related to this product or handle them as needed.
+    // For now, assuming onDelete: Cascade is set or movements are kept for historical reasons.
+    await prisma.stockMovement.deleteMany({ where: { productId }}); // If you want to delete movements
     await prisma.product.delete({
       where: { id: productId },
     });
@@ -138,90 +135,108 @@ export async function deleteProductAction(productId: string): Promise<void> {
   }
 }
 
-export async function decreaseProductStockAction(productId: string, quantityToDecrease: number): Promise<Product> {
-  try {
-    const product = await prisma.product.findUnique({ where: { id: productId } });
-    if (!product) throw new Error("Product not found for stock decrease.");
+async function logStockMovement(
+  productId: string,
+  type: StockMovementType,
+  quantityChange: number,
+  reason?: string,
+  referenceId?: string,
+  userId?: string
+): Promise<Product> {
+  return await prisma.$transaction(async (tx) => {
+    const product = await tx.product.findUnique({ where: { id: productId } });
+    if (!product) throw new Error(`Product with ID ${productId} not found for stock movement.`);
 
-    const newQuantity = Math.max(0, product.quantity - quantityToDecrease);
+    const quantityBefore = product.quantity;
+    const quantityAfter = quantityBefore + quantityChange;
+
+    if (quantityAfter < 0) {
+      throw new Error(`Stock quantity for ${product.name} cannot go below zero. Current: ${quantityBefore}, Change: ${quantityChange}`);
+    }
     
-    const updatedDbProduct = await prisma.product.update({
+    const updatedProduct = await tx.product.update({
       where: { id: productId },
-      data: { quantity: newQuantity },
+      data: { quantity: quantityAfter },
       include: { category: true },
     });
+
+    await tx.stockMovement.create({
+      data: {
+        productId,
+        type,
+        quantityChange,
+        quantityBefore,
+        quantityAfter,
+        reason,
+        referenceId,
+        userId,
+      },
+    });
+    return updatedProduct;
+  });
+}
+
+
+export async function decreaseProductStockAction(
+  productId: string, 
+  quantityToDecrease: number,
+  movementType: StockMovementType,
+  reason?: string,
+  referenceId?: string,
+  userId?: string
+): Promise<Product> {
+  try {
+    if (quantityToDecrease <= 0) throw new Error("Quantity to decrease must be positive.");
+    const updatedDbProduct = await logStockMovement(productId, movementType, -quantityToDecrease, reason, referenceId, userId);
+    
     revalidatePath('/inventory');
     revalidatePath(`/inventory/${productId}`);
     revalidatePath('/pos'); 
     revalidatePath('/admin/products'); 
+    revalidatePath(`/inventory/${productId}/history`);
     if (updatedDbProduct.category) {
         revalidatePath(`/inventory?category=${encodeURIComponent(updatedDbProduct.category.name)}`);
     }
     return mapPrismaProductToAppProduct(updatedDbProduct);
   } catch (error) {
     console.error('Failed to decrease product stock action:', error);
+    if (error instanceof Error) {
+        throw new Error(error.message);
+    }
     throw new Error('Could not decrease product stock.');
   }
 }
 
-export async function increaseProductStockAction(productId: string, quantityToIncrease: number): Promise<Product> {
+export async function increaseProductStockAction(
+  productId: string, 
+  quantityToIncrease: number,
+  movementType: StockMovementType,
+  reason?: string,
+  referenceId?: string,
+  userId?: string
+): Promise<Product> {
   try {
-    const product = await prisma.product.findUnique({ where: { id: productId } });
-    if (!product) throw new Error("Product not found for stock increase.");
-    
-    const newQuantity = product.quantity + quantityToIncrease;
+    if (quantityToIncrease <= 0) throw new Error("Quantity to increase must be positive.");
+    const updatedDbProduct = await logStockMovement(productId, movementType, quantityToIncrease, reason, referenceId, userId);
 
-    const updatedDbProduct = await prisma.product.update({
-      where: { id: productId },
-      data: { quantity: newQuantity },
-      include: { category: true },
-    });
     revalidatePath('/inventory');
     revalidatePath(`/inventory/${productId}`);
     revalidatePath('/purchasing'); 
     revalidatePath('/admin/products');
+    revalidatePath(`/inventory/${productId}/history`);
      if (updatedDbProduct.category) {
         revalidatePath(`/inventory?category=${encodeURIComponent(updatedDbProduct.category.name)}`);
     }
     return mapPrismaProductToAppProduct(updatedDbProduct);
   } catch (error) {
     console.error('Failed to increase product stock action:', error);
+    if (error instanceof Error) {
+        throw new Error(error.message);
+    }
     throw new Error('Could not increase product stock.');
   }
 }
 
-// This function is now deprecated in favor of fetching from the Category table.
-// Kept for reference or if a quick list from products is ever needed again without relations.
-export async function fetchDistinctProductCategories_DEPRECATED(): Promise<string[]> {
-  try {
-    const categories = await prisma.product.findMany({
-      select: {
-        // category: true, // This field is removed
-        // Instead, if you wanted to get categories products are assigned to:
-        // category: { select: { name: true }} // but this needs grouping
-      },
-      // distinct: ['category'], // This field is removed
-      // orderBy: {
-      //   category: 'asc',
-      // },
-      // where: {
-      //   category: {
-      //     not: null, 
-      //     notIn: [''], 
-      //   }
-      // }
-    });
-    // This logic needs complete rewrite if based on Product table.
-    // For now, returning empty as it's deprecated.
-    console.warn("fetchDistinctProductCategories_DEPRECATED is called. Use fetchCategories from Category actions instead.")
-    return [];
-  } catch (error) {
-    console.error('Failed to fetch product categories (deprecated):', error);
-    return []; 
-  }
-}
-
-// New action to fetch categories from the Category table
 export async function fetchAllCategoriesAction(): Promise<Category[]> {
   try {
     const dbCategories = await prisma.category.findMany({
@@ -233,3 +248,36 @@ export async function fetchAllCategoriesAction(): Promise<Category[]> {
     throw new Error('Could not fetch categories.');
   }
 }
+
+
+// Action to fetch stock movements for a product
+export async function fetchStockMovementsByProductId(productId: string): Promise<import('@/lib/types').StockMovement[]> {
+  try {
+    const movements = await prisma.stockMovement.findMany({
+      where: { productId },
+      orderBy: { createdAt: 'desc' },
+      include: { product: true, user: true } 
+    });
+    return movements.map(m => ({
+      ...m,
+      type: m.type as StockMovementType, // Ensure enum type
+      createdAt: m.createdAt.toISOString(),
+      product: m.product ? mapPrismaProductToAppProduct(m.product) : undefined,
+      user: m.user ? {
+        id: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+        role: m.user.role,
+        avatarUrl: m.user.avatarUrl,
+        isActive: m.user.isActive,
+        lastLogin: m.user.lastLogin?.toISOString(),
+        createdAt: m.user.createdAt.toISOString(),
+        updatedAt: m.user.updatedAt.toISOString(),
+      } : undefined,
+    }));
+  } catch (error) {
+    console.error(`Failed to fetch stock movements for product ${productId}:`, error);
+    throw new Error('Could not fetch stock movements.');
+  }
+}
+

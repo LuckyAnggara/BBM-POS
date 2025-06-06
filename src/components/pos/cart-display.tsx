@@ -2,7 +2,7 @@
 'use client';
 import { useCartStore } from '@/store/cart-store';
 import { useInventoryStore } from '@/store/inventory-store';
-import type { CartItem, SaleDataForCreation, Customer } from '@/lib/types';
+import type { CartItem, SaleDataForCreation, Customer, StockMovementTypeEnum } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
@@ -27,9 +27,9 @@ export function CartDisplay() {
     discountAmount, setDiscountAmount,
     taxPercent, setTaxPercent,
     shippingCost, setShippingCost,
-    paymentMethod, setPaymentMethod // Get paymentMethod and its setter
+    paymentMethod, setPaymentMethod
   } = useCartStore();
-  const { decreaseStock, getProductById } = useInventoryStore();
+  const { decreaseStock, getProductById } = useInventoryStore(); // decreaseStock is now more general
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [customerName, setCustomerName] = useState(''); 
   const [promoCode, setPromoCode] = useState('');
@@ -65,6 +65,9 @@ export function CartDisplay() {
       return;
     }
     setIsCheckingOut(true);
+
+    // Server-side stock check is now part of recordSale transaction
+    // Client-side pre-check is still good for UX
     for (const item of items) {
       const productInInventory = getProductById(item.productId);
       if (!productInInventory || productInInventory.quantity < item.quantity) {
@@ -73,6 +76,7 @@ export function CartDisplay() {
         return;
       }
     }
+
     let foundCustomer: Customer | null = null;
     
     if (customerName.trim()) { 
@@ -95,23 +99,24 @@ export function CartDisplay() {
       shippingCost,
       customerName: customerName.trim() || undefined, 
       customerId: foundCustomer?.id || undefined,
-      paymentMethod: paymentMethod, // Pass selected payment method
-      // status will default to "Completed" in the server action
+      paymentMethod: paymentMethod,
     };
     try {
       const recordedSale = await recordSale(saleDataPayload);
-      for (const item of items) {
-        await decreaseStock(item.productId, item.quantity);
-      }
+      // Stock decrease and movement logging now handled by recordSale -> decreaseProductStockAction
+
       toast.success("Sale " + recordedSale.saleNumber + " successful!", {
           description: (customerName ? "Customer: " + customerName + ". " : '') + "Total: $" + recordedSale.grandTotal.toFixed(2) + " for " + totalItems() + " items."
       });
       clearCart();
       setCustomerName('');
       setPromoCode('');
-      // Payment method will persist in store, no need to reset here unless desired
     } catch (error) {
-        toast.error("An error occurred during checkout. Please try again.");
+        if (error instanceof Error) {
+            toast.error(error.message); // Show specific error from server action
+        } else {
+            toast.error("An error occurred during checkout. Please try again.");
+        }
         console.error("Checkout error:", error);
     } finally {
         setIsCheckingOut(false);

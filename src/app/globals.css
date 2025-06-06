@@ -25,47 +25,49 @@
     --ring: 224 71.4% 4.1%;
     --radius: 0.5rem;
 
-    /* Chart colors (can be kept or adjusted based on preference) */
+    /* Chart colors */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
 
-    /* Sidebar specific colors for New York Theme (Dark Sidebar) */
-    --sidebar-background: 224 71.4% 4.1%; /* Near Black */
-    --sidebar-foreground: 210 20% 98%;    /* Off White Text */
-    --sidebar-primary: 210 20% 98%;       /* Active item text color - Off White */
-    --sidebar-primary-foreground: 224 71.4% 4.1%; /* Active item background - Near black (if needed, or use accent) */
-    --sidebar-accent: 220 13% 18%;        /* Hover background - Darker Gray */
-    --sidebar-accent-foreground: 210 20% 98%; /* Hover text - Off White */
-    --sidebar-border: 220 13% 18%;        /* Darker Gray border */
-    --sidebar-ring: 210 20% 98%;
+    /* Sidebar specific colors for New Light Theme */
+    --sidebar-background: 0 0% 97.3%; /* zinc-100 equivalent */
+    --sidebar-foreground: 240 10% 3.9%;    /* zinc-900 equivalent for text/icons */
+    --sidebar-primary: 220.9 39.3% 11%;       /* Active item text color - Dark Blue (main primary) */
+    --sidebar-primary-foreground: 0 0% 100%; /* Active item background - White or very light gray, not really used by shadcn-sidebar directly this way */
+    --sidebar-accent: 0 0% 92.8%;        /* Hover background - zinc-200 equivalent */
+    --sidebar-accent-foreground: 240 10% 3.9%; /* Hover text - zinc-900 */
+    --sidebar-border: 0 0% 89.8%;        /* zinc-300 equivalent for borders */
+    --sidebar-ring: 220.9 39.3% 11%;
   }
 
   .dark {
-    --background: 224 71.4% 4.1%; /* Near Black */
-    --foreground: 210 20% 98%;    /* Off White */
+    --background: 224 71.4% 4.1%;
+    --foreground: 210 20% 98%;
     --card: 224 71.4% 4.1%;
     --card-foreground: 210 20% 98%;
     --popover: 224 71.4% 4.1%;
     --popover-foreground: 210 20% 98%;
-    --primary: 210 20% 98%; /* Off White */
-    --primary-foreground: 220.9 39.3% 11%; /* Dark Blue */
-    --secondary: 215 27.9% 16.9%; /* Dark Gray */
+    --primary: 210 20% 98%;
+    --primary-foreground: 220.9 39.3% 11%;
+    --secondary: 215 27.9% 16.9%;
     --secondary-foreground: 210 20% 98%;
     --muted: 215 27.9% 16.9%;
-    --muted-foreground: 217.9 10.6% 64.9%; /* Lighter Gray */
+    --muted-foreground: 217.9 10.6% 64.9%;
     --accent: 215 27.9% 16.9%;
     --accent-foreground: 210 20% 98%;
-    --destructive: 0 62.8% 30.6%; /* Dark Red */
+    --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 20% 98%;
-    --border: 215 27.9% 16.9%; /* Dark Gray Border */
+    --border: 215 27.9% 16.9%;
     --input: 215 27.9% 16.9%;
     --ring: 210 20% 98%;
 
-    /* Sidebar specific colors for New York Theme (Dark Sidebar remains consistent) */
-    --sidebar-background: 224 71.4% 4.1%;
+    /* Dark mode sidebar (can remain dark or adapt if needed) */
+    /* For consistency with image, let's make dark mode sidebar also light if desired */
+    /* OR keep it dark as per original theme if preferred for dark mode */
+    --sidebar-background: 224 71.4% 4.1%; /* Defaulting to original dark sidebar for dark mode */
     --sidebar-foreground: 210 20% 98%;
     --sidebar-primary: 210 20% 98%;
     --sidebar-primary-foreground: 224 71.4% 4.1%;
@@ -82,6 +84,5 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* font-family: Arial, Helvetica, sans-serif; */ /* Removed, handled by Tailwind */
   }
 }

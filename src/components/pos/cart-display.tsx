@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { findOrCreateCustomer, recordSale } from '@/app/pos/actions'; // Corrected path
-import { fetchAppSettings } from '@/app/(app)/admin/settings/actions'; // Ensured precise path
+import { fetchAppSettings } from '@/app/admin/settings/actions'; // Ensured precise (app)path
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
 

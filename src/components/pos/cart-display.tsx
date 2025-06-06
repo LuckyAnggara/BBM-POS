@@ -7,15 +7,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2, User as UserIcon, Percent, Truck, Tag as DiscountIcon, ChevronDown, DollarSign } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2, User as UserIcon, Percent, LogOut, DollarSign } from 'lucide-react'; // Ditambahkan LogOut
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { findOrCreateCustomer, recordSale } from '@/app/pos/actions';
-import { fetchAppSettings } from '@/app/admin/settings/actions'; // Import fetchAppSettings
+import { fetchAppSettings } from '@/app/admin/settings/actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Link from 'next/link';
 
 
 const MOCK_USER_ID = 'user_staff_charlie'; 
@@ -25,7 +26,7 @@ export function CartDisplay() {
     items, removeItem, updateItemQuantity, clearCart, totalItems, 
     subtotal, grandTotal,
     discountAmount, setDiscountAmount,
-    taxPercent, setTaxPercent, // taxPercent now comes from store, set by fetchAppSettings
+    taxPercent, setTaxPercent,
     shippingCost, setShippingCost
   } = useCartStore();
   const { decreaseStock, getProductById } = useInventoryStore();
@@ -39,11 +40,10 @@ export function CartDisplay() {
       setIsLoadingSettings(true);
       try {
         const settings = await fetchAppSettings();
-        setTaxPercent(settings.defaultTaxRate); // Initialize tax rate from settings
+        setTaxPercent(settings.defaultTaxRate); 
       } catch (error) {
         console.error("Failed to load app settings for POS:", error);
         toast.error("Could not load tax settings.");
-        // Keep default taxPercent (0) from store if fetch fails
       } finally {
         setIsLoadingSettings(false);
       }
@@ -68,7 +68,7 @@ export function CartDisplay() {
     for (const item of items) {
       const productInInventory = getProductById(item.productId);
       if (!productInInventory || productInInventory.quantity < item.quantity) {
-        toast.error(`Not enough stock for ${item.name}. Available: ${productInInventory?.quantity || 0}. Required: ${item.quantity}`);
+        toast.error(\`Not enough stock for \${item.name}. Available: \${productInInventory?.quantity || 0}. Required: \${item.quantity}\`);
         setIsCheckingOut(false);
         return;
       }
@@ -91,7 +91,7 @@ export function CartDisplay() {
       cartItems: items,
       subtotal: currentSubtotalVal,
       discountAmount,
-      taxPercent, // taxPercent from store, which was set from AppSettings
+      taxPercent, 
       shippingCost,
       customerName: customerName.trim() || undefined, 
       customerId: foundCustomer?.id || undefined,
@@ -101,8 +101,8 @@ export function CartDisplay() {
       for (const item of items) {
         await decreaseStock(item.productId, item.quantity);
       }
-      toast.success(`Sale ${recordedSale.saleNumber} successful!`, {
-          description: `${customerName ? `Customer: ${customerName}. ` : ''}Total: $${recordedSale.grandTotal.toFixed(2)} for ${totalItems()} items.`
+      toast.success(\`Sale \${recordedSale.saleNumber} successful!\`, {
+          description: \`\${customerName ? \`Customer: \${customerName}. \` : ''}Total: $\${recordedSale.grandTotal.toFixed(2)} for \${totalItems()} items.\`
       });
       clearCart();
       setCustomerName('');
@@ -122,47 +122,56 @@ export function CartDisplay() {
 
   return (
     <Card className="flex flex-col h-full shadow-lg">
-      <CardHeader className="border-b p-4">
+      <CardHeader className="border-b p-3">
         <div className="flex items-center justify-between">
-            <CardTitle className="text-xl font-headline">Cart</CardTitle>
-            <Button variant="link" className="text-sm p-0 h-auto text-primary" onClick={() => { clearCart(); setCustomerName(''); setPromoCode(''); }} disabled={isCheckingOut || items.length === 0}>
-                Clear
-            </Button>
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg font-headline">Cart</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="text-xs px-2 py-1 h-auto" onClick={() => { clearCart(); setCustomerName(''); setPromoCode(''); }} disabled={isCheckingOut || items.length === 0}>
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Clear
+                </Button>
+                 <Link href="/" legacyBehavior passHref>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Exit POS">
+                       <LogOut className="h-4 w-4"/>
+                    </Button>
+                </Link>
+            </div>
         </div>
-        <CardDescription className="text-xs">CART DETAILS</CardDescription>
       </CardHeader>
       
       <ScrollArea className="flex-1">
         <CardContent className="p-0">
           {items.length === 0 ? (
-            <div className="text-center py-12 px-4">
-              <ShoppingCart className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">Your cart is empty.</p>
-              <p className="text-sm text-muted-foreground">Add products from the selection panel.</p>
+            <div className="text-center py-10 px-4">
+              <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">Your cart is empty.</p>
+              <p className="text-xs text-muted-foreground">Add products from the selection panel.</p>
             </div>
           ) : (
-            <div className="p-4 text-sm text-muted-foreground">{totalItems()} Item{totalItems() > 1 ? 's' : ''} Selected</div>
+            <div className="p-3 text-xs text-muted-foreground">{totalItems()} Item{totalItems() > 1 ? 's' : ''} Selected</div>
           )}
             <ul className="divide-y">
               {items.map(item => (
-                <li key={item.productId} className="flex items-start p-4 gap-3">
+                <li key={item.productId} className="flex items-start p-3 gap-2.5">
                   <Image
-                    src={item.imageUrl || "https://placehold.co/64x64.png"}
+                    src={item.imageUrl || "https://placehold.co/48x48.png"}
                     alt={item.name}
-                    width={56} 
-                    height={56}
-                    className="rounded-md object-cover border"
+                    width={48} 
+                    height={48}
+                    className="rounded border object-cover"
                     data-ai-hint="product thumbnail"
                   />
                   <div className="flex-grow">
-                    <h4 className="font-semibold text-sm" title={item.name}>{item.name}</h4>
-                    <p className="text-xs text-muted-foreground">{(getProductById(item.productId)?.category?.name || 'Item')} - Size: XS - Color: Blue</p> {/* Placeholder details */}
-                    <p className="text-sm font-bold mt-0.5">${item.price.toFixed(2)}</p>
+                    <h4 className="font-semibold text-xs leading-tight" title={item.name}>{item.name}</h4>
+                    <p className="text-xs text-muted-foreground">{(getProductById(item.productId)?.category?.name || 'Item')}</p>
+                    <p className="text-xs font-bold mt-0.5">${item.price.toFixed(2)}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                      <div className="flex items-center">
-                      <Button variant="outline" size="icon" className="h-7 w-7 rounded-r-none border-r-0" onClick={() => handleQuantityChange(item.productId, item.quantity, -1)} disabled={isCheckingOut}>
-                        <Minus className="h-3.5 w-3.5" />
+                      <Button variant="outline" size="icon" className="h-6 w-6 rounded-r-none border-r-0" onClick={() => handleQuantityChange(item.productId, item.quantity, -1)} disabled={isCheckingOut}>
+                        <Minus className="h-3 w-3" />
                       </Button>
                       <Input
                         type="number"
@@ -171,15 +180,15 @@ export function CartDisplay() {
                             const val = parseInt(e.target.value);
                             updateItemQuantity(item.productId, isNaN(val) || val < 0 ? 0 : val);
                         }}
-                        className="h-7 w-10 text-center px-1 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 border-input"
+                        className="h-6 w-8 text-center px-0.5 text-xs rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 border-input"
                         min="0"
                         disabled={isCheckingOut}
                       />
-                      <Button variant="outline" size="icon" className="h-7 w-7 rounded-l-none border-l-0" onClick={() => handleQuantityChange(item.productId, item.quantity, 1)} disabled={isCheckingOut}>
-                        <Plus className="h-3.5 w-3.5" />
+                      <Button variant="outline" size="icon" className="h-6 w-6 rounded-l-none border-l-0" onClick={() => handleQuantityChange(item.productId, item.quantity, 1)} disabled={isCheckingOut}>
+                        <Plus className="h-3 w-3" />
                       </Button>
                     </div>
-                     <p className="text-sm font-semibold mt-1">${(item.price * item.quantity).toFixed(2)}</p>
+                     <p className="text-xs font-semibold mt-0.5">${(item.price * item.quantity).toFixed(2)}</p>
                   </div>
                 </li>
               ))}
@@ -188,7 +197,7 @@ export function CartDisplay() {
       </ScrollArea>
       
       {items.length > 0 && (
-        <CardFooter className="flex flex-col gap-3 p-4 border-t mt-auto">
+        <CardFooter className="flex flex-col gap-2.5 p-3 border-t mt-auto">
           <Input 
             id="customerName" 
             type="text" 
@@ -196,11 +205,11 @@ export function CartDisplay() {
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
             disabled={isCheckingOut}
-            className="h-10"
+            className="h-9 text-xs"
           />
           <div className="grid grid-cols-2 gap-2 w-full">
-            <div className="space-y-1">
-              <Label htmlFor="discountAmount" className="text-xs">Discount Amount ($)</Label>
+            <div className="space-y-0.5">
+              <Label htmlFor="discountAmount" className="text-xs">Discount ($)</Label>
               <Input 
                 id="discountAmount" 
                 type="number" 
@@ -208,11 +217,11 @@ export function CartDisplay() {
                 value={discountAmount}
                 onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
                 disabled={isCheckingOut}
-                className="h-9"
+                className="h-8 text-xs"
               />
             </div>
-            <div className="space-y-1">
-                <Label htmlFor="shippingCost" className="text-xs">Shipping Cost ($)</Label>
+            <div className="space-y-0.5">
+                <Label htmlFor="shippingCost" className="text-xs">Shipping ($)</Label>
                 <Input 
                     id="shippingCost" 
                     type="number" 
@@ -220,32 +229,32 @@ export function CartDisplay() {
                     value={shippingCost}
                     onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
                     disabled={isCheckingOut}
-                    className="h-9"
+                    className="h-8 text-xs"
                 />
             </div>
           </div>
           
-          <p className="text-sm font-medium self-start mt-2">Payment Details</p>
-          <div className="w-full flex justify-between text-sm">
+          <p className="text-xs font-medium self-start mt-1">Payment Details</p>
+          <div className="w-full flex justify-between text-xs">
             <span className="text-muted-foreground">Sub Totals</span>
             <span>${currentSubtotal.toFixed(2)}</span>
           </div>
-          <div className="w-full flex justify-between text-sm">
+          <div className="w-full flex justify-between text-xs">
             <span className="text-muted-foreground">Discount</span>
             <span className={discountAmount > 0 ? "text-green-600" : ""}>-${discountAmount.toFixed(2)}</span>
           </div>
-          <div className="w-full flex justify-between text-sm">
-            <span className="text-muted-foreground">PPN {isLoadingSettings ? <Loader2 className="h-3 w-3 inline animate-spin"/> : `${taxPercent.toFixed(1)}%`}</span>
+          <div className="w-full flex justify-between text-xs">
+            <span className="text-muted-foreground">PPN {isLoadingSettings ? <Loader2 className="h-3 w-3 inline animate-spin"/> : \`\${taxPercent.toFixed(1)}%\`}</span>
             <span>${currentTaxAmount.toFixed(2)}</span>
           </div>
            {shippingCost > 0 && (
-            <div className="w-full flex justify-between text-sm text-muted-foreground">
+            <div className="w-full flex justify-between text-xs text-muted-foreground">
               <span>Shipping</span>
               <span>${shippingCost.toFixed(2)}</span>
             </div>
           )}
-          <Separator className="my-1"/>
-          <div className="w-full flex justify-between text-lg font-bold font-headline">
+          <Separator className="my-0.5"/>
+          <div className="w-full flex justify-between text-base font-bold font-headline">
             <span>TOTAL</span>
             <span>${currentGrandTotal.toFixed(2)}</span>
           </div>
@@ -258,39 +267,39 @@ export function CartDisplay() {
                 value={promoCode}
                 onChange={(e) => setPromoCode(e.target.value)}
                 disabled={isCheckingOut}
-                className="h-10 flex-grow"
+                className="h-9 text-xs flex-grow"
             />
-            <Button variant="outline" className="h-10" onClick={() => toast.info("Promo code applied (placeholder).")} disabled={isCheckingOut || !promoCode}>Apply</Button>
+            <Button variant="outline" className="h-9 text-xs px-3" onClick={() => toast.info("Promo code applied (placeholder).")} disabled={isCheckingOut || !promoCode}>Apply</Button>
           </div>
 
           <Select defaultValue="visa" disabled={isCheckingOut}>
-            <SelectTrigger className="w-full h-10">
+            <SelectTrigger className="w-full h-9 text-xs">
                 <SelectValue placeholder="Select payment method" />
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value="visa">
-                    <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4"/> 
+                    <div className="flex items-center gap-2 text-xs">
+                        <CreditCard className="h-3.5 w-3.5"/> 
                         VISA
                     </div>
                 </SelectItem>
                 <SelectItem value="mastercard">
-                     <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4"/>
+                     <div className="flex items-center gap-2 text-xs">
+                        <CreditCard className="h-3.5 w-3.5"/>
                         Mastercard
                     </div>
                 </SelectItem>
                 <SelectItem value="cash">
-                     <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4"/>
+                     <div className="flex items-center gap-2 text-xs">
+                        <DollarSign className="h-3.5 w-3.5"/>
                         Cash
                     </div>
                 </SelectItem>
             </SelectContent>
           </Select>
 
-          <Button size="lg" className="w-full mt-2 h-12 text-base" onClick={handleCheckout} disabled={isCheckingOut || isLoadingSettings}>
-            {isCheckingOut || isLoadingSettings ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+          <Button size="lg" className="w-full mt-1 h-10 text-sm" onClick={handleCheckout} disabled={isCheckingOut || isLoadingSettings}>
+            {isCheckingOut || isLoadingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Pay
             {isCheckingOut || isLoadingSettings ? "" : <span className="ml-1">➔</span>}
           </Button>
@@ -299,5 +308,3 @@ export function CartDisplay() {
     </Card>
   );
 }
-
-    

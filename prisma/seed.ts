@@ -10,11 +10,12 @@ async function main() {
   await prisma.saleItem.deleteMany();
   await prisma.sale.deleteMany();
   await prisma.customer.deleteMany();
-  await prisma.appSettings.deleteMany(); 
   await prisma.purchaseOrderItem.deleteMany();
   await prisma.purchaseOrder.deleteMany();
   await prisma.user.deleteMany();
   await prisma.product.deleteMany();
+  await prisma.category.deleteMany(); // Clear categories before products
+  await prisma.appSettings.deleteMany(); 
 
   // Seed AppSettings (ensure only one record)
   await prisma.appSettings.upsert({
@@ -36,31 +37,61 @@ async function main() {
   });
   console.log(`Created/ensured main app settings.`);
 
+  // Seed Categories
+  const categoriesToCreate = [
+    { name: 'Fruits' },
+    { name: 'Bakery' },
+    { name: 'Dairy & Eggs' },
+    { name: 'Beverages' },
+    { name: 'Pantry Staples' },
+    { name: 'Men' },
+    { name: 'Women' },
+    { name: 'Accessories' },
+    { name: 'Uncategorized' }, // Default category
+  ];
+  const createdCategories = [];
+  for (const cat of categoriesToCreate) {
+    const category = await prisma.category.create({ data: cat });
+    createdCategories.push(category);
+    console.log(`Created category with id: ${category.id} (${category.name})`);
+  }
+
+  const getCategoryIdByName = (name: string) => {
+    const found = createdCategories.find(c => c.name === name);
+    if (!found) {
+        const uncategorized = createdCategories.find(c => c.name === 'Uncategorized');
+        console.warn(`Category "${name}" not found, using "Uncategorized".`);
+        return uncategorized!.id; // Fallback to Uncategorized, ensure it exists
+    }
+    return found.id;
+  }
+
+
   // Seed Products
   const productsToCreate = [
     {
-      id: 'prod_apple', name: 'Organic Apples', sku: 'ORG-APP-001', category: 'Fruits', quantity: 150, price: 2.99, costPrice: 1.50, supplier: 'Fresh Farms Inc.', description: 'Crisp and delicious organic apples, perfect for snacking or baking.', imageUrl: 'https://placehold.co/300x200/a2cf6e/ffffff.png?text=Apples', tags: JSON.stringify(['organic', 'fruit', 'healthy']), lowStockThreshold: 20,
+      id: 'prod_apple', name: 'Organic Apples', sku: 'ORG-APP-001', categoryId: getCategoryIdByName('Fruits'), quantity: 150, price: 2.99, costPrice: 1.50, supplier: 'Fresh Farms Inc.', description: 'Crisp and delicious organic apples, perfect for snacking or baking.', imageUrl: 'https://placehold.co/300x200/a2cf6e/ffffff.png?text=Apples', tags: JSON.stringify(['organic', 'fruit', 'healthy']), lowStockThreshold: 20,
     },
     {
-      id: 'prod_bread', name: 'Whole Wheat Bread', sku: 'WW-BRD-002', category: 'Bakery', quantity: 75, price: 4.50, costPrice: 2.20, supplier: 'Artisan Bakers Co.', description: 'Freshly baked whole wheat bread, rich in fiber.', imageUrl: 'https://placehold.co/300x200/d4a373/ffffff.png?text=Bread', tags: JSON.stringify(['bakery', 'bread', 'whole wheat']), lowStockThreshold: 10,
+      id: 'prod_bread', name: 'Whole Wheat Bread', sku: 'WW-BRD-002', categoryId: getCategoryIdByName('Bakery'), quantity: 75, price: 4.50, costPrice: 2.20, supplier: 'Artisan Bakers Co.', description: 'Freshly baked whole wheat bread, rich in fiber.', imageUrl: 'https://placehold.co/300x200/d4a373/ffffff.png?text=Bread', tags: JSON.stringify(['bakery', 'bread', 'whole wheat']), lowStockThreshold: 10,
     },
     {
-      id: 'prod_eggs', name: 'Free-Range Eggs (Dozen)', sku: 'FR-EGG-003', category: 'Dairy & Eggs', quantity: 100, price: 5.99, costPrice: 3.00, supplier: 'Happy Hens Farm', description: 'Grade A large free-range eggs.', imageUrl: 'https://placehold.co/300x200/fefae0/000000.png?text=Eggs', tags: JSON.stringify(['eggs', 'dairy', 'free-range']), lowStockThreshold: 15,
+      id: 'prod_eggs', name: 'Free-Range Eggs (Dozen)', sku: 'FR-EGG-003', categoryId: getCategoryIdByName('Dairy & Eggs'), quantity: 100, price: 5.99, costPrice: 3.00, supplier: 'Happy Hens Farm', description: 'Grade A large free-range eggs.', imageUrl: 'https://placehold.co/300x200/fefae0/000000.png?text=Eggs', tags: JSON.stringify(['eggs', 'dairy', 'free-range']), lowStockThreshold: 15,
     },
     {
-      id: 'prod_coffee', name: 'Artisanal Coffee Beans', sku: 'COF-BEA-004', category: 'Beverages', quantity: 50, price: 12.99, costPrice: 7.50, supplier: 'Roast Masters Ltd.', description: 'Premium whole coffee beans, medium roast.', imageUrl: 'https://placehold.co/300x200/6f4e37/ffffff.png?text=Coffee', tags: JSON.stringify(['coffee', 'beverage', 'premium']), lowStockThreshold: 5,
+      id: 'prod_coffee', name: 'Artisanal Coffee Beans', sku: 'COF-BEA-004', categoryId: getCategoryIdByName('Beverages'), quantity: 50, price: 12.99, costPrice: 7.50, supplier: 'Roast Masters Ltd.', description: 'Premium whole coffee beans, medium roast.', imageUrl: 'https://placehold.co/300x200/6f4e37/ffffff.png?text=Coffee', tags: JSON.stringify(['coffee', 'beverage', 'premium']), lowStockThreshold: 5,
     },
     {
-      id: 'prod_oil', name: 'Extra Virgin Olive Oil', sku: 'OIL-EVO-005', category: 'Pantry Staples', quantity: 80, price: 9.75, costPrice: 5.25, supplier: 'Mediterranean Groves', description: 'Cold-pressed extra virgin olive oil, 500ml.', imageUrl: 'https://placehold.co/300x200/808000/ffffff.png?text=Oil', tags: JSON.stringify(['oil', 'pantry', 'cooking']), lowStockThreshold: 10,
+      id: 'prod_oil', name: 'Extra Virgin Olive Oil', sku: 'OIL-EVO-005', categoryId: getCategoryIdByName('Pantry Staples'), quantity: 80, price: 9.75, costPrice: 5.25, supplier: 'Mediterranean Groves', description: 'Cold-pressed extra virgin olive oil, 500ml.', imageUrl: 'https://placehold.co/300x200/808000/ffffff.png?text=Oil', tags: JSON.stringify(['oil', 'pantry', 'cooking']), lowStockThreshold: 10,
     },
     {
-      id: 'prod_shirt_men', name: 'Men\'s Classic Tee', sku: 'MEN-TEE-001', category: 'Men', quantity: 120, price: 25.00, costPrice: 10.00, supplier: 'Apparel Co.', description: 'Comfortable and stylish classic t-shirt for men.', imageUrl: 'https://placehold.co/300x200/5c677d/ffffff.png?text=Men+Tee', tags: JSON.stringify(['clothing', 'men', 'tshirt']), lowStockThreshold: 15,
+      id: 'prod_shirt_men', name: 'Men\'s Classic Tee', sku: 'MEN-TEE-001', categoryId: getCategoryIdByName('Men'), quantity: 120, price: 25.00, costPrice: 10.00, supplier: 'Apparel Co.', description: 'Comfortable and stylish classic t-shirt for men.', imageUrl: 'https://placehold.co/300x200/5c677d/ffffff.png?text=Men+Tee', tags: JSON.stringify(['clothing', 'men', 'tshirt']), lowStockThreshold: 15,
     },
     {
-      id: 'prod_dress_women', name: 'Women\'s Summer Dress', sku: 'WOM-DRS-001', category: 'Women', quantity: 80, price: 45.00, costPrice: 18.00, supplier: 'Fashionista Ltd.', description: 'Light and airy summer dress for women.', imageUrl: 'https://placehold.co/300x200/f4a261/ffffff.png?text=Dress', tags: JSON.stringify(['clothing', 'women', 'dress']), lowStockThreshold: 10,
+      id: 'prod_dress_women', name: 'Women\'s Summer Dress', sku: 'WOM-DRS-001', categoryId: getCategoryIdByName('Women'), quantity: 80, price: 45.00, costPrice: 18.00, supplier: 'Fashionista Ltd.', description: 'Light and airy summer dress for women.', imageUrl: 'https://placehold.co/300x200/f4a261/ffffff.png?text=Dress', tags: JSON.stringify(['clothing', 'women', 'dress']), lowStockThreshold: 10,
     },
      {
-      id: 'prod_cap_unisex', name: 'Unisex Baseball Cap', sku: 'UNI-CAP-001', category: 'Accessories', quantity: 200, price: 15.99, costPrice: 6.50, supplier: 'Headwear Inc.', description: 'Adjustable and comfortable baseball cap for all.', imageUrl: 'https://placehold.co/300x200/2a9d8f/ffffff.png?text=Cap', tags: JSON.stringify(['accessory', 'unisex', 'cap']), lowStockThreshold: 25,
+      id: 'prod_cap_unisex', name: 'Unisex Baseball Cap', sku: 'UNI-CAP-001', categoryId: getCategoryIdByName('Accessories'), quantity: 200, price: 15.99, costPrice: 6.50, supplier: 'Headwear Inc.', description: 'Adjustable and comfortable baseball cap for all.', imageUrl: 'https://placehold.co/300x200/2a9d8f/ffffff.png?text=Cap', tags: JSON.stringify(['accessory', 'unisex', 'cap']), lowStockThreshold: 25,
     },
   ];
 
@@ -80,7 +111,7 @@ async function main() {
       id: 'user_manager_bob', name: 'Bob The Builder', email: 'bob@stockpilot.com', role: "MANAGER", avatarUrl: 'https://placehold.co/100x100/FFC107/000000.png?text=BB', isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
     },
     {
-      id: 'user_staff_charlie', name: 'Charlie Brown', email: 'charlie@stockpilot.com', role: "STAFF", avatarUrl: 'https://placehold.co/100x100/4CAF50/FFFFFF.png?text=CB', isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 3), // Make Charlie active
+      id: 'user_staff_charlie', name: 'Charlie Brown', email: 'charlie@stockpilot.com', role: "STAFF", avatarUrl: 'https://placehold.co/100x100/4CAF50/FFFFFF.png?text=CB', isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 60 * 3), 
     },
     {
       id: 'user_staff_diana', name: 'Diana Prince', email: 'diana@stockpilot.com', role: "STAFF", isActive: true, lastLogin: new Date(Date.now() - 1000 * 60 * 30),
@@ -150,8 +181,8 @@ async function main() {
             status: "Ordered", 
             discountAmount: 5.00,
             shippingCost: 5.00,
-            taxes: 0.00, // Example: 0 taxes for this PO
-            totalAmount: ( (createdProducts[1].costPrice || 2.20) * 30 ) - 5.00 + 5.00,  // Subtotal - Discount + Shipping + Taxes
+            taxes: 0.00, 
+            totalAmount: ( (createdProducts[1].costPrice || 2.20) * 30 ) - 5.00 + 5.00,
             createdById: adminUser.id,
             items: {
             create: [
@@ -169,8 +200,6 @@ async function main() {
         console.log(`Created PO with id: ${po2.id}`);
     }
   }
-  // Sales will be created via app usage
-
   console.log(`Seeding finished.`);
 }
 

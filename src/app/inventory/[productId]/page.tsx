@@ -7,7 +7,7 @@ import { useInventoryStore } from '@/store/inventory-store';
 import type { Product } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Edit, Package, DollarSign, BarChart3, Tag, Info, CalendarDays, Truck, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Edit, Package, DollarSign, BarChart3, Tag, Info, CalendarDays, Truck, AlertTriangle, ListTree } from 'lucide-react';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,7 +24,7 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (products.length === 0) {
-      fetchProducts();
+      fetchProducts(); // This will fetch products with their categories
     }
   }, [fetchProducts, products.length]);
 
@@ -115,7 +115,10 @@ export default function ProductDetailPage() {
             <CardHeader>
               <CardTitle className="text-2xl font-semibold">{product.name}</CardTitle>
               <CardDescription>
-                <Badge variant="outline" className="mr-2">{product.category}</Badge>
+                <Badge variant="outline" className="mr-2 flex items-center gap-1">
+                    <ListTree className="h-3 w-3" />
+                    {product.category?.name || 'Uncategorized'}
+                </Badge>
                 SKU: {product.sku}
               </CardDescription>
             </CardHeader>

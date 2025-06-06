@@ -16,17 +16,26 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useInventoryStore } from '@/store/inventory-store';
-import type { Product } from '@/lib/types';
+import type { Product, Category } from '@/lib/types';
 import { toast } from 'sonner';
-import { Save, ArrowLeft } from 'lucide-react';
+import { Save, ArrowLeft, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import { fetchAllCategoriesAction } from '../actions'; // Fetch categories
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
   sku: z.string().min(1, 'SKU is required'),
-  category: z.string().min(1, 'Category is required'),
+  categoryId: z.string().optional(), // Changed from category to categoryId
   price: z.coerce.number().min(0, 'Price must be a positive number'),
   quantity: z.coerce.number().int().min(0, 'Quantity must be a non-negative integer'),
   costPrice: z.coerce.number().min(0, 'Cost price must be a positive number').optional().or(z.literal('')),
@@ -41,12 +50,30 @@ type ProductFormValues = z.infer<typeof productSchema>;
 export default function AddProductPage() {
   const { addProduct } = useInventoryStore();
   const router = useRouter();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
+  useEffect(() => {
+    async function loadCategories() {
+      setIsLoadingCategories(true);
+      try {
+        const fetchedCategories = await fetchAllCategoriesAction();
+        setCategories(fetchedCategories);
+      } catch (error) {
+        toast.error("Failed to load categories for dropdown.");
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    }
+    loadCategories();
+  }, []);
+
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: '',
       sku: '',
-      category: '',
+      categoryId: '', // Initialize categoryId
       price: 0,
       quantity: 0,
       description: '',
@@ -59,15 +86,16 @@ export default function AddProductPage() {
 
   const onSubmit = async (data: ProductFormValues) => {
     try {
-      const productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'tags'> = {
+      const productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'tags' | 'category'> = {
         ...data,
         price: Number(data.price),
         quantity: Number(data.quantity),
         costPrice: data.costPrice ? Number(data.costPrice) : undefined,
         lowStockThreshold: data.lowStockThreshold ? Number(data.lowStockThreshold) : undefined,
         imageUrl: data.imageUrl || undefined,
+        categoryId: data.categoryId || undefined, // Ensure categoryId is passed
       };
-      await addProduct(productData);
+      await addProduct(productData); // addProduct in store needs to handle categoryId
       toast.success('Product added successfully!');
       router.push('/inventory');
     } catch (error) {
@@ -128,13 +156,25 @@ export default function AddProductPage() {
               </div>
               <FormField
                 control={form.control}
-                name="category"
+                name="categoryId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Fruits" {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingCategories}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "Select a category"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                         <SelectItem value=""><em>Uncategorized</em></SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -239,8 +279,8 @@ export default function AddProductPage() {
             </CardContent>
             <CardFooter className="flex justify-end gap-2 py-4 border-t">
               <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                <Save className="mr-2 h-4 w-4" />
+              <Button type="submit" disabled={form.formState.isSubmitting || isLoadingCategories}>
+                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 {form.formState.isSubmitting ? 'Saving...' : 'Save Product'}
               </Button>
             </CardFooter>

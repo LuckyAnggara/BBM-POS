@@ -1,7 +1,7 @@
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = "file:./dev.db"
 }
 
 generator client {
@@ -12,134 +12,163 @@ model Product {
   id                String  @id @default(cuid())
   name              String
   sku               String  @unique
-  category          String
   quantity          Int
   price             Float
   costPrice         Float?
   supplier          String?
   description       String?
   imageUrl          String?
-  tags              String? // Stored as JSON string: ["tag1", "tag2"]
+  tags              String? // JSON string for tags: ["tag1", "tag2"]
   lowStockThreshold Int?
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   purchaseOrderItems PurchaseOrderItem[]
   saleItems          SaleItem[]
+
+  @@index([name])
+  @@index([sku])
 }
 
-model User {
-  id        String  @id @default(cuid())
-  name      String
-  email     String  @unique
-  role      String // "ADMIN", "MANAGER", "STAFF"
-  avatarUrl String?
-  isActive  Boolean @default(true)
-  lastLogin DateTime?
+model Category {
+  id   String @id @default(cuid())
+  name String @unique
+
+  products Product[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  purchaseOrders PurchaseOrder[]
-  sales          Sale[]
 }
 
 model PurchaseOrder {
-  id                    String   @id @default(cuid())
-  poNumber              String   @unique
-  supplierName          String
-  orderDate             DateTime
-  expectedDeliveryDate  DateTime?
-  status                String // e.g., "Draft", "Ordered", "Received", "Cancelled"
-  items                 PurchaseOrderItem[]
-  discountAmount        Float?   @default(0)
-  shippingCost          Float?   @default(0)
-  taxes                 Float?   @default(0) // Could be amount or percentage based on convention
-  totalAmount           Float
-  notes                 String?
-  createdById           String
-  createdBy             User     @relation(fields: [createdById], references: [id])
+  id                   String    @id @default(cuid())
+  poNumber             String    @unique // e.g. PO-2023-0001
+  supplierName         String
+  orderDate            DateTime
+  expectedDeliveryDate DateTime?
+  status               String // e.g. "Draft", "Ordered", "Received", "Cancelled"
+  items                PurchaseOrderItem[]
+  discountAmount       Float?
+  shippingCost         Float?
+  taxes                Float?
+  totalAmount          Float
+  notes                String?
+  createdById          String
+  createdBy            User      @relation(fields: [createdById], references: [id])
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@index([poNumber])
+  @@index([supplierName])
+  @@index([status])
 }
 
 model PurchaseOrderItem {
-  id                String   @id @default(cuid())
-  purchaseOrderId   String
-  purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  productId         String
-  product           Product  @relation(fields: [productId], references: [id])
-  productName       String // Denormalized for easier display on PO
-  quantityOrdered   Int
-  quantityReceived  Int?
-  unitCost          Float
-  totalCost         Float    // quantityOrdered * unitCost
+  id               String        @id @default(cuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product       @relation(fields: [productId], references: [id])
+  productName      String // Denormalized for easier display on PO if product name changes later
+  quantityOrdered  Int
+  quantityReceived Int?
+  unitCost         Float
+  totalCost        Float
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@index([purchaseOrderId])
+  @@index([productId])
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  role          String // e.g. "ADMIN", "MANAGER", "STAFF"
+  avatarUrl     String?
+  isActive      Boolean  @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  purchaseOrders PurchaseOrder[]
+  sales         Sale[]
+
+  @@index([email])
+  @@index([role])
 }
 
 model AppSettings {
-  id                 String   @id @default("main_settings") // Ensure only one record
-  appName            String   @default("StockPilot")
-  dateFormat         String   @default("MM/dd/yyyy")
-  timeZone           String   @default("America/New_York")
-  defaultCurrency    String   @default("USD")
-  emailNotifications Boolean  @default(true)
-  lowStockAlerts     Boolean  @default(true)
-  newOrderAlerts     Boolean  @default(false)
-  defaultTaxRate     Float    @default(0) // e.g., 10 for 10%
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String    @id @default("main_settings") // Ensure only one settings record
+  appName            String    @default("StockPilot HQ")
+  dateFormat         String    @default("yyyy-MM-dd")
+  timeZone           String    @default("Europe/London")
+  defaultCurrency    String    @default("GBP")
+  emailNotifications Boolean   @default(true)
+  lowStockAlerts     Boolean   @default(true)
+  newOrderAlerts     Boolean   @default(true)
+  defaultTaxRate     Float     @default(10.0) // e.g., 10 for 10%
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 model Customer {
-  id    String @id @default(cuid())
-  name  String
-  email String? @unique
-  phone String?
-
-  sales Sale[]
-
+  id        String   @id @default(cuid())
+  name      String
+  email     String?  @unique
+  phone     String?
+  address   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  sales     Sale[]
+
+  @@index([name])
+  @@index([email])
 }
 
 model Sale {
-  id             String   @id @default(cuid())
-  saleNumber     String   @unique
+  id             String     @id @default(cuid())
+  saleNumber     String     @unique // Auto-generated e.g. SALE-YYYYMMDD-XXXX
   saleDate       DateTime
   customerId     String?
-  customer       Customer? @relation(fields: [customerId], references: [id])
-  customerName   String? // Denormalized if customer is not registered or for quick display
-  userId         String   // Cashier/User who made the sale
-  user           User     @relation(fields: [userId], references: [id])
-  items          SaleItem[]
+  customer       Customer?  @relation(fields: [customerId], references: [id])
+  customerName   String? // Denormalized, in case customer is guest or name changes
+  userId         String     // Cashier/User who made the sale
+  user           User       @relation(fields: [userId], references: [id])
   subtotal       Float
-  discountAmount Float    @default(0)
-  taxPercent     Float    @default(0) // The tax percentage applied at the time of sale
-  taxAmount      Float    @default(0) // Calculated tax amount
-  shippingCost   Float    @default(0)
+  discountAmount Float?
+  taxPercent     Float?     // Tax percentage at the time of sale
+  taxAmount      Float?     // Calculated tax amount
+  shippingCost   Float?
   grandTotal     Float
+  paymentMethod  String?    // e.g. "Cash", "Card"
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  items          SaleItem[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@index([saleNumber])
+  @@index([customerId])
+  @@index([userId])
 }
 
 model SaleItem {
-  id         String @id @default(cuid())
-  saleId     String
-  sale       Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  productId  String
-  product    Product @relation(fields: [productId], references: [id])
-  productName String // Denormalized product name at time of sale
-  quantity   Int
-  unitPrice  Float  // Price of product at time of sale
-  totalPrice Float  // quantity * unitPrice
+  id          String   @id @default(cuid())
+  saleId      String
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  productName String   // Denormalized product name at time of sale
+  quantity    Int
+  unitPrice   Float    // Price of product at time of sale
+  totalPrice  Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@index([saleId])
+  @@index([productId])
 }

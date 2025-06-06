@@ -1,34 +1,28 @@
+
 import type { ReactNode } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
-import { Users, Package, Settings, ChevronRight } from 'lucide-react';
-// import { usePathname } from 'next/navigation'; // Client component needed for this
-// For server component, we manage active state differently or pass it down.
-
-// This is a server component, so usePathname won't work directly here.
-// If complex active state logic is needed, this could be a client component,
-// or active state can be inferred by child page components.
+import { Users, Package, Settings, ChevronRight, ListTree } from 'lucide-react'; // Added ListTree
 
 const adminNavItems = [
   { href: '/admin/users', label: 'User Management', icon: Users },
   { href: '/admin/products', label: 'Product Catalog', icon: Package },
+  { href: '/admin/categories', label: 'Manage Categories', icon: ListTree }, // Added Categories link
   { href: '/admin/settings', label: 'System Settings', icon: Settings },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  // const pathname = usePathname(); // This line makes it a Client Component
-  
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
         <div>
           <h1 className="text-3xl font-headline font-semibold">Admin Panel</h1>
-          <p className="text-muted-foreground">Manage system settings, users, and application data.</p>
+          <p className="text-muted-foreground">Manage system settings, users, products, and categories.</p>
         </div>
       </div>
       
       <div className="grid md:grid-cols-[280px_1fr] gap-6 items-start">
-        <Card className="sticky top-[calc(var(--header-height,56px)+theme(spacing.6))]"> {/* Adjust top based on header height */}
+        <Card className="sticky top-[calc(var(--header-height,56px)+theme(spacing.6))]">
           <CardContent className="p-4">
             <nav className="flex flex-col gap-1">
               {adminNavItems.map(item => (
@@ -48,7 +42,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </nav>
           </CardContent>
         </Card>
-        <div className="min-w-0"> {/* This div is important for flexbox/grid item to not overflow */}
+        <div className="min-w-0">
           {children}
         </div>
       </div>

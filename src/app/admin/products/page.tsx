@@ -29,13 +29,13 @@ export default function AdminProductManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts(); // This will fetch products including their category relation
   }, [fetchProducts]);
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (product.category?.name && product.category.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (product.supplier && product.supplier.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
@@ -58,7 +58,7 @@ export default function AdminProductManagementPage() {
       ? [...(product.tags || []), 'archived'] 
       : product.tags?.filter(t => t !== 'archived');
     
-    updateProduct(product.id, { tags: newTags }); // This will update the product in the store
+    updateProduct(product.id, { tags: newTags }); 
     toast.success(`Product "${product.name}" ${newArchivedStatus ? 'archived' : 'unarchived'}.`);
   };
 
@@ -88,7 +88,7 @@ export default function AdminProductManagementPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline">
+          <Button variant="outline" disabled> {/* TODO: Implement category filter based on new Category model */}
             <Filter className="mr-2 h-4 w-4" />
             Filter
           </Button>
@@ -166,7 +166,7 @@ export default function AdminProductManagementPage() {
                     <Link href={`/inventory/${product.id}`} className="font-medium hover:underline">{product.name}</Link>
                     <div className="text-xs text-muted-foreground">SKU: {product.sku}</div>
                   </TableCell>
-                  <TableCell className="text-xs">{product.category}</TableCell>
+                  <TableCell className="text-xs">{product.category?.name || 'Uncategorized'}</TableCell>
                   <TableCell className="text-xs">{product.supplier || 'N/A'}</TableCell>
                   <TableCell className="text-right text-xs">${product.price.toFixed(2)}</TableCell>
                   <TableCell className="text-right text-xs">${(product.costPrice || 0).toFixed(2)}</TableCell>

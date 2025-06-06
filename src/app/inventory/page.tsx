@@ -1,6 +1,7 @@
 
 'use client';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation'; // For reading category query param
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,7 +41,7 @@ const ProductCardItem = ({ product, onDeleteClick }: { product: Product; onDelet
       <CardTitle className="text-lg font-headline">
          <Link href={`/inventory/${product.id}`} className="hover:underline">{product.name}</Link>
       </CardTitle>
-      <CardDescription>{product.category} - SKU: {product.sku}</CardDescription>
+      <CardDescription>{product.category?.name || 'Uncategorized'} - SKU: {product.sku}</CardDescription>
     </CardHeader>
     <CardContent className="p-4 flex-grow">
       <div className="flex justify-between items-center text-sm mb-1">
@@ -72,16 +73,25 @@ export default function InventoryPage() {
   const { products, fetchProducts, isLoading, deleteProduct } = useInventoryStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const searchParams = useSearchParams();
+  const categoryQuery = searchParams.get('categoryName'); // Get category from URL
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter(product => {
+    const matchesSearchTerm =
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.category?.name && product.category.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesCategory = categoryQuery 
+        ? product.category?.name?.toLowerCase() === categoryQuery.toLowerCase() 
+        : true;
+
+    return matchesSearchTerm && matchesCategory;
+  });
 
   const handleDelete = (productId: string) => {
     toast.warning('Are you sure you want to delete this product?', {
@@ -100,7 +110,9 @@ export default function InventoryPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-headline font-semibold">Product Inventory</h1>
+          <h1 className="text-3xl font-headline font-semibold">
+            {categoryQuery ? `Inventory - ${categoryQuery}` : "Product Inventory"}
+          </h1>
           <p className="text-muted-foreground">Manage your products, track stock levels, and view details.</p>
         </div>
         <Link href="/inventory/add" passHref>
@@ -126,7 +138,7 @@ export default function InventoryPage() {
             <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="shrink-0">
+                <Button variant="outline" className="shrink-0" disabled> {/* TODO: Make functional with new categories */}
                   <Filter className="mr-2 h-4 w-4" />
                   Filter
                 </Button>
@@ -134,11 +146,8 @@ export default function InventoryPage() {
               <DropdownMenuContent align="end" className="w-[200px]">
                 <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {/* Placeholder for category filters */}
+                {/* TODO: Populate with actual categories from Category table */}
                 <DropdownMenuCheckboxItem checked>All</DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem>Fruits</DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem>Bakery</DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem>Dairy & Eggs</DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button variant="outline" size="icon" onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'bg-accent text-accent-foreground' : ''} aria-label="List view">
@@ -232,7 +241,7 @@ export default function InventoryPage() {
                         </Link>
                       </TableCell>
                       <TableCell>{product.sku}</TableCell>
-                      <TableCell>{product.category}</TableCell>
+                      <TableCell>{product.category?.name || 'Uncategorized'}</TableCell>
                       <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
                         <Badge variant={product.quantity < (product.lowStockThreshold || 10) ? "destructive" : "default"}>
@@ -281,4 +290,3 @@ export default function InventoryPage() {
     </div>
   );
 }
-

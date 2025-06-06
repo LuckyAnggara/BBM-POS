@@ -1,11 +1,16 @@
 
-import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, AppSettings as PrismaAppSettings, Customer as PrismaCustomer, Sale as PrismaSale, SaleItem as PrismaSaleItem } from '@prisma/client';
+import type { User as PrismaUser, Product as PrismaProduct, PurchaseOrder as PrismaPurchaseOrder, PurchaseOrderItem as PrismaPurchaseOrderItem, AppSettings as PrismaAppSettings, Customer as PrismaCustomer, Sale as PrismaSale, SaleItem as PrismaSaleItem, Category as PrismaCategory } from '@prisma/client';
+
+export interface Category extends Omit<PrismaCategory, 'createdAt' | 'updatedAt'> {
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
+}
 
 export interface Product {
   id: string;
   name: string;
   sku: string;
-  category: string;
+  // category: string; // Replaced by category relation
   quantity: number;
   price: number;
   costPrice?: number | null;
@@ -14,6 +19,10 @@ export interface Product {
   imageUrl?: string | null;
   tags?: string[];
   lowStockThreshold?: number | null;
+  
+  categoryId?: string | null;
+  category?: Category | null; // For eager loading
+
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
 }
@@ -24,6 +33,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   imageUrl?: string | null;
+  // categoryName?: string | null; // If needed in cart from Product.category.name
 }
 
 export type PurchaseOrderStatus = string;
@@ -86,8 +96,8 @@ export interface Supplier {
   updatedAt: string;
 }
 
-export interface AppSettings extends Omit<PrismaAppSettings, 'createdAt' | 'updatedAt'> {
-  defaultTaxRate: number;
+export interface AppSettings extends Omit<PrismaAppSettings, 'createdAt' | 'updatedAt' | 'defaultTaxRate'> {
+  defaultTaxRate: number; // Ensure this is number, Prisma model uses Float
   createdAt: string; 
   updatedAt: string; 
 }

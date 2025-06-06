@@ -1,5 +1,6 @@
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, Users, Package, Settings, Activity } from "lucide-react";
+import { BarChart, Users, Package, Settings, Activity, ListTree } from "lucide-react"; // Added ListTree
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -34,6 +35,19 @@ export default function AdminOverviewPage() {
               <CardContent>
                 <p className="text-xs text-muted-foreground">Oversee all products, categories, and supplier details.</p>
                  <Button variant="link" className="p-0 h-auto mt-2 text-sm">Go to Products &rarr;</Button>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/admin/categories" legacyBehavior passHref>
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Manage Categories</CardTitle>
+                <ListTree className="h-5 w-5 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Define and organize product categories.</p>
+                 <Button variant="link" className="p-0 h-auto mt-2 text-sm">Go to Categories &rarr;</Button>
               </CardContent>
             </Card>
           </Link>

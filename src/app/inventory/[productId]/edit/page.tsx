@@ -17,18 +17,26 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useInventoryStore } from '@/store/inventory-store';
-import type { Product } from '@/lib/types';
+import type { Product, Category } from '@/lib/types';
 import { toast } from 'sonner';
 import { Save, ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { fetchAllCategoriesAction } from '../../actions'; // Fetch categories
 
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
   sku: z.string().min(1, 'SKU is required'),
-  category: z.string().min(1, 'Category is required'),
+  categoryId: z.string().optional(), // Changed from category to categoryId
   price: z.coerce.number().min(0, 'Price must be a positive number'),
   quantity: z.coerce.number().int().min(0, 'Quantity must be a non-negative integer'),
   costPrice: z.coerce.number().min(0, 'Cost price must be a positive number').optional().or(z.literal('')),
@@ -48,13 +56,15 @@ export default function EditProductPage() {
   const { products, fetchProducts, getProductById, updateProduct } = useInventoryStore();
   const [product, setProduct] = useState<Product | null | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: { // Default values will be overridden by product data
+    defaultValues: {
       name: '',
       sku: '',
-      category: '',
+      categoryId: '',
       price: 0,
       quantity: 0,
       costPrice: '',
@@ -66,10 +76,23 @@ export default function EditProductPage() {
   });
 
   useEffect(() => {
-    if (products.length === 0) {
-      fetchProducts();
+    async function loadInitialData() {
+      setIsLoadingCategories(true);
+      if (products.length === 0) {
+        await fetchProducts(); // Fetch products if store is empty
+      }
+      try {
+        const fetchedCategories = await fetchAllCategoriesAction();
+        setCategories(fetchedCategories);
+      } catch (error) {
+        toast.error("Failed to load categories for dropdown.");
+      } finally {
+        setIsLoadingCategories(false);
+      }
     }
+    loadInitialData();
   }, [fetchProducts, products.length]);
+
 
   useEffect(() => {
     if (productId && products.length > 0) {
@@ -79,7 +102,7 @@ export default function EditProductPage() {
         form.reset({
           name: foundProduct.name,
           sku: foundProduct.sku,
-          category: foundProduct.category,
+          categoryId: foundProduct.categoryId || '', // Use categoryId
           price: foundProduct.price,
           quantity: foundProduct.quantity,
           costPrice: foundProduct.costPrice ?? '',
@@ -96,13 +119,14 @@ export default function EditProductPage() {
     if (!product) return;
     setIsSubmitting(true);
     try {
-      const updatedData: Partial<Product> = {
+      const updatedData: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'category'>> = {
         ...data,
         price: Number(data.price),
         quantity: Number(data.quantity),
         costPrice: data.costPrice !== '' && data.costPrice !== undefined ? Number(data.costPrice) : undefined,
         lowStockThreshold: data.lowStockThreshold !== '' && data.lowStockThreshold !== undefined ? Number(data.lowStockThreshold) : undefined,
         imageUrl: data.imageUrl || undefined,
+        categoryId: data.categoryId || undefined,
       };
       await updateProduct(product.id, updatedData);
       toast.success('Product updated successfully!');
@@ -115,7 +139,7 @@ export default function EditProductPage() {
     }
   };
   
-  if (product === undefined) { // Still loading product data
+  if (product === undefined || isLoadingCategories) { 
     return (
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-4">
@@ -138,7 +162,7 @@ export default function EditProductPage() {
     );
   }
 
-  if (product === null) { // Product not found after loading
+  if (product === null) { 
     return (
        <div className="flex flex-col items-center justify-center h-full text-center">
         <AlertTriangle className="w-16 h-16 text-destructive mb-4" />
@@ -207,13 +231,25 @@ export default function EditProductPage() {
               </div>
               <FormField
                 control={form.control}
-                name="category"
+                name="categoryId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Fruits" {...field} />
-                    </FormControl>
+                     <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingCategories}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={isLoadingCategories ? "Loading..." : "Select a category"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value=""><em>Uncategorized</em></SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -318,7 +354,7 @@ export default function EditProductPage() {
             </CardContent>
             <CardFooter className="flex justify-end gap-2 py-4 border-t">
               <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>Cancel</Button>
-              <Button type="submit" disabled={isSubmitting || form.formState.isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || form.formState.isSubmitting || isLoadingCategories}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 {isSubmitting ? 'Saving...' : 'Save Changes'}
               </Button>

@@ -2,7 +2,7 @@
 'use server';
 
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { redirect } from 'next/navigation'; // Import redirect
 import type { User } from '@/lib/types';
 import { prisma } from '@/lib/prisma'; // For potential future use with real DB lookup
 
@@ -16,20 +16,12 @@ interface LoginResult {
   error?: string;
 }
 
-export async function loginUser(credentials: { email?: string; password?: string }): Promise<LoginResult> {
+export async function loginUser(credentials: { email?: string; password?: string }): Promise<LoginResult | void> { // Return type updated
   if (!credentials.email || !credentials.password) {
     return { success: false, error: 'Email dan password tidak boleh kosong.' };
   }
 
-  // In a real application, you would:
-  // 1. Fetch user from database by email:
-  //    const userFromDb = await prisma.user.findUnique({ where: { email: credentials.email } });
-  // 2. If user exists, compare hashed password:
-  //    const isValidPassword = await bcrypt.compare(credentials.password, userFromDb.passwordHash);
-  // 3. If valid, create session / JWT.
-
   if (credentials.email === MOCK_EMAIL && credentials.password === MOCK_PASSWORD) {
-    // Mock user data - in a real app, this comes from the database
     const mockUser: Omit<User, 'createdAt' | 'updatedAt' | 'lastLogin' | 'role'> & { role: string } = {
       id: 'user_admin_alice', // from seed
       name: 'Admin User',
@@ -39,7 +31,6 @@ export async function loginUser(credentials: { email?: string; password?: string
       isActive: true,
     };
 
-    // Create a session cookie
     const sessionData = JSON.stringify({ userId: mockUser.id, email: mockUser.email, name: mockUser.name, role: mockUser.role });
     cookies().set('auth_session', sessionData, {
       httpOnly: true,
@@ -49,7 +40,7 @@ export async function loginUser(credentials: { email?: string; password?: string
       sameSite: 'lax',
     });
 
-    return { success: true, user: mockUser };
+    redirect('/'); // Perform redirect from server action
   }
 
   return { success: false, error: 'Email atau password salah.' };
@@ -66,7 +57,7 @@ export async function getSession(): Promise<{ user: User; session: string } | nu
     return null;
   }
   try {
-    const parsedSession = JSON.parse(sessionCookie.value) as User; // Assuming session stores User-like structure
+    const parsedSession = JSON.parse(sessionCookie.value) as User; 
     return { user: parsedSession, session: sessionCookie.value };
   } catch (error) {
     console.error('Failed to parse session cookie:', error);

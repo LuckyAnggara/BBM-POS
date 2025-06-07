@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
-import { findOrCreateCustomer, recordSale } from '@/app/pos/actions';
+import { findOrCreateCustomer, recordSale } from '@/app/(pos)/actions'; // Corrected import path
 import { fetchAppSettings } from '@/app/admin/settings/actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';

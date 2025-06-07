@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import type { PosSession } from '@/lib/types';
 import { toast } from 'sonner';
-import { getActivePosSession, startPosSession as startPosSessionAction } from '@/app/pos/actions';
+import { getActivePosSession, startPosSession as startPosSessionAction } from '@/app/(pos)/actions';
 
 interface PosSessionState {
   activeSession: PosSession | null;
@@ -58,3 +58,4 @@ export const usePosSessionStore = create<PosSessionState>((set, get) => ({
     // Optionally: toast.info("POS session cleared.");
   },
 }));
+

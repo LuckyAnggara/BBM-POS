@@ -2,27 +2,32 @@
 import NextAuth, { type NextAuthConfig } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@auth/prisma-adapter';
-import { prisma as actualPrismaInstance } from '@/lib/prisma'; // Renamed for clarity
-import { PrismaClient } from '@prisma/client'; // For instanceof check
+// Import PrismaClient constructor directly for instanceof check and creating a new instance
+import { PrismaClient } from '@prisma/client'; 
+// Keep the import for the global/singleton instance for comparison or potential fallback
+// import { prisma as actualPrismaInstance } from '@/lib/prisma'; 
 import bcrypt from 'bcryptjs';
-import type { User as AppUserType } from '@/lib/types'; // Your application's User type
+import type { User as AppUserType } from '@/lib/types';
 
-console.log(`[auth.ts] Top-level: Prisma client (actualPrismaInstance) imported: ${!!actualPrismaInstance}`);
+// console.log(`[auth.ts] Top-level: Actual Prisma client (actualPrismaInstance) imported: ${!!actualPrismaInstance}`);
 console.log(`[auth.ts] Top-level: PrismaClient constructor imported: ${typeof PrismaClient}`);
 console.log(`[auth.ts] Top-level: PrismaAdapter imported: ${typeof PrismaAdapter}`);
 console.log(`[auth.ts] Top-level: CredentialsProvider imported: ${typeof CredentialsProvider}`);
 
-// Log details about the actualPrismaInstance
-if (actualPrismaInstance) {
-  console.log(`[auth.ts] Actual Prisma instance type: ${typeof actualPrismaInstance}`);
-  console.log(`[auth.ts] Actual Prisma instance instanceof PrismaClient: ${actualPrismaInstance instanceof PrismaClient}`);
-  console.log(`[auth.ts] Actual Prisma instance keys: ${Object.keys(actualPrismaInstance || {}).join(', ')}`);
+// Create a new PrismaClient instance specifically for the adapter
+const prismaInstanceForAdapter = new PrismaClient();
+console.log(`[auth.ts] New Prisma instance FOR ADAPTER created. Type: ${typeof prismaInstanceForAdapter}`);
+console.log(`[auth.ts] New Prisma instance FOR ADAPTER instanceof ImportedPrismaClient: ${prismaInstanceForAdapter instanceof PrismaClient}`);
+if (prismaInstanceForAdapter) {
+  console.log(`[auth.ts] New Prisma instance FOR ADAPTER keys: ${Object.keys(prismaInstanceForAdapter || {}).join(', ')}`);
 } else {
-  console.error("[auth.ts] CRITICAL: actualPrismaInstance is null or undefined!");
+  console.error("[auth.ts] CRITICAL: prismaInstanceForAdapter is null or undefined!");
 }
 
-const initializedPrismaAdapter = PrismaAdapter(actualPrismaInstance);
-console.log(`[auth.ts] Initialized PrismaAdapter: ${typeof initializedPrismaAdapter}`, initializedPrismaAdapter ? Object.keys(initializedPrismaAdapter).join(', ') : null);
+// Pass the new instance to PrismaAdapter
+const initializedPrismaAdapter = PrismaAdapter(prismaInstanceForAdapter);
+console.log(`[auth.ts] Initialized PrismaAdapter with NEW instance: ${typeof initializedPrismaAdapter}`, initializedPrismaAdapter ? Object.keys(initializedPrismaAdapter).join(', ') : null);
+
 
 const credentialsProviderConfig = CredentialsProvider({
   name: 'Credentials',
@@ -41,7 +46,8 @@ const credentialsProviderConfig = CredentialsProvider({
     const password = credentials.password as string;
 
     try {
-      const userFromDb = await actualPrismaInstance.user.findUnique({
+      // Use the specific instance for adapter for DB operations within authorize
+      const userFromDb = await prismaInstanceForAdapter.user.findUnique({
         where: { email: email },
       });
 
@@ -67,7 +73,7 @@ const credentialsProviderConfig = CredentialsProvider({
       }
       
       try {
-        await actualPrismaInstance.user.update({
+        await prismaInstanceForAdapter.user.update({
           where: { id: userFromDb.id },
           data: { lastLogin: new Date() },
         });
@@ -82,7 +88,7 @@ const credentialsProviderConfig = CredentialsProvider({
         email: userFromDb.email,
         image: userFromDb.image,
         role: userFromDb.role,
-        isActive: !!userFromDb.isActive, // Ensure boolean
+        isActive: !!userFromDb.isActive,
       };
       console.log("[auth.ts] Authorize: User authenticated successfully. Returning user object:", JSON.stringify(userToReturn, null, 2));
       return userToReturn;
@@ -115,10 +121,8 @@ export const authConfig: NextAuthConfig = {
       // console.log("[auth.ts] JWT Callback - Input Token (start):", JSON.stringify(token, null, 2));
       // console.log("[auth.ts] JWT Callback - Input User (on sign in):", JSON.stringify(user, null, 2));
 
-      if (user) { // On initial sign-in, 'user' object (from authorize) is available
+      if (user) { 
         token.id = user.id;
-        // Make sure AppUserType has role and isActive, and that 'user' object conforms to it.
-        // The user object from authorize should match the structure expected here.
         const customUser = user as AppUserType & { isActive?: boolean, role?: string | null, id: string };
         token.role = customUser.role; 
         token.isActive = !!customUser.isActive; 
@@ -180,5 +184,4 @@ export async function getCurrentUser() {
   const sessionData = await auth(); 
   return sessionData?.user;
 }
-
     

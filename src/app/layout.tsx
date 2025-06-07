@@ -4,9 +4,6 @@ import type { Metadata } from 'next';
 import { Toaster as SonnerToaster } from 'sonner';
 import { AppShell } from '@/components/layout/app-shell';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { auth } from '@/lib/auth'; // Import auth from NextAuth config
-import NextAuthSessionProvider from '@/components/providers/session-provider'; // Renamed component
-import type { User as AppUserType } from '@/lib/types'; // Your application's User type
 
 export const metadata: Metadata = {
   title: 'StockPilot',
@@ -18,26 +15,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth(); // Fetch session on the server
-  // Cast NextAuth user to your application's User type if necessary
-  // Ensure your NextAuth callbacks (jwt, session) populate all needed fields
-  const user = session?.user as (AppUserType & { id: string; role?: string | null; isActive?: boolean; image?: string | null }) | undefined;
-
-  const appShellUserProps = user ? {
-    id: user.id,
-    name: user.name ?? 'User',
-    email: user.email ?? '',
-    role: user.role ?? 'STAFF',
-    avatarUrl: user.image,
-    isActive: Boolean(user.isActive), // Ensure isActive is a boolean
-    // These might not be directly available from NextAuth session user
-    // Ensure your callbacks populate them if they are strictly needed by AppShell
-    // Or make them optional in AppShell's user prop type.
-    // createdAt: user.createdAt || new Date().toISOString(), 
-    // updatedAt: user.updatedAt || new Date().toISOString(),
-    // lastLogin: user.lastLogin || null,
-  } : undefined;
-
+  // Authentication logic (auth(), session, user) has been removed.
+  // AppShell no longer receives a user prop from here.
+  // NavUser component will need to be adjusted or will display a generic state.
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -58,22 +38,13 @@ export default async function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <NextAuthSessionProvider session={session}> {/* Pass server session to provider */}
-          {appShellUserProps ? (
-            <SidebarProvider>
-              <AppShell user={appShellUserProps as any /* Cast if AppShell expects more fields not in session */}>
-                {children}
-                <SonnerToaster richColors position="top-right" />
-              </AppShell>
-            </SidebarProvider>
-          ) : (
-            <>
-              {children}
-              {/* SonnerToaster can also be here for login page toasts if needed */}
-              <SonnerToaster richColors position="top-right" />
-            </>
-          )}
-        </NextAuthSessionProvider>
+        {/* NextAuthSessionProvider has been removed */}
+        <SidebarProvider>
+          <AppShell> {/* AppShell no longer receives user prop here */}
+            {children}
+            <SonnerToaster richColors position="top-right" />
+          </AppShell>
+        </SidebarProvider>
       </body>
     </html>
   );

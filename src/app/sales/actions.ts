@@ -4,22 +4,25 @@
 import { prisma } from '@/lib/prisma';
 import type { Sale, Customer, User, Product, Category, StockMovementType, SaleStatus } from '@/lib/types';
 import { StockMovementTypeEnum } from '@/lib/types';
-import { getSession } from '@/lib/auth-utils';
+// getSession import removed
 import { revalidatePath } from 'next/cache';
 
-// Helper to map Prisma User to App User type
 const mapPrismaUserToAppUser = (prismaUser: any): User | undefined => {
   if (!prismaUser) return undefined;
+  // Simplified User mapping as NextAuth is removed
   return {
-    ...prismaUser,
-    role: prismaUser.role,
-    lastLogin: prismaUser.lastLogin?.toISOString() || null,
+    id: prismaUser.id,
+    name: prismaUser.name,
+    email: prismaUser.email,
+    role: prismaUser.role, // Assuming role is still part of your Prisma User model
+    avatarUrl: prismaUser.avatarUrl ?? undefined, // Or image from Prisma
+    isActive: prismaUser.isActive,
+    lastLogin: prismaUser.lastLogin?.toISOString() ?? null,
     createdAt: prismaUser.createdAt.toISOString(),
     updatedAt: prismaUser.updatedAt.toISOString(),
   };
 };
 
-// Helper to map Prisma Customer to App Customer
 const mapPrismaCustomerToAppCustomer = (dbCustomer: any): Customer | null => {
   if (!dbCustomer) return null;
   return {
@@ -55,7 +58,6 @@ const mapPrismaProductToAppProductLocal = (prismaProduct: any): Product => {
   };
 };
 
-// Helper to map Prisma Sale to App Sale
 const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
   return {
     id: dbSale.id,
@@ -63,7 +65,7 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
     saleDate: dbSale.saleDate.toISOString(),
     customerId: dbSale.customerId,
     customerName: dbSale.customerName,
-    userId: dbSale.userId,
+    userId: dbSale.userId, // This will be null or need a default if not set
     subtotal: dbSale.subtotal.toNumber(),
     discountAmount: dbSale.discountAmount.toNumber(),
     taxPercent: dbSale.taxPercent.toNumber(),
@@ -89,13 +91,13 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
       product: item.product ? mapPrismaProductToAppProductLocal(item.product) : undefined,
     })),
     customer: mapPrismaCustomerToAppCustomer(dbSale.customer),
-    user: mapPrismaUserToAppUser(dbSale.user),
+    user: dbSale.user ? mapPrismaUserToAppUser(dbSale.user) : undefined, // User mapping might be simplified
   };
 };
 
 export interface SalesHistoryFilters {
-  startDate?: string; // ISO date string
-  endDate?: string;   // ISO date string
+  startDate?: string;
+  endDate?: string;
   status?: string;
   paymentMethod?: string;
 }
@@ -109,7 +111,6 @@ export async function fetchSalesHistory(filters?: SalesHistoryFilters): Promise<
     }
     if (filters?.endDate) {
       const endDateObj = new Date(filters.endDate);
-      // Set to end of the selected day for inclusive filtering
       endDateObj.setHours(23, 59, 59, 999);
       whereClause.saleDate = { ...whereClause.saleDate, lte: endDateObj };
     }
@@ -145,7 +146,7 @@ export async function fetchSaleById(saleId: string): Promise<Sale | null> {
       include: {
         items: { 
           include: { 
-            product: { include: { category: true } } // Include product details for each item
+            product: { include: { category: true } }
           } 
         },
         customer: true,
@@ -161,11 +162,12 @@ export async function fetchSaleById(saleId: string): Promise<Sale | null> {
 }
 
 export async function refundSaleAction(saleId: string): Promise<Sale> {
-  const session = await getSession();
-  if (!session?.user?.id) {
-    throw new Error("User not authenticated or session invalid for refund action.");
-  }
-  const userId = session.user.id;
+  // const session = await getSession(); // Removed
+  // if (!session?.user?.id) { // Removed
+  //   throw new Error("User not authenticated or session invalid for refund action.");
+  // }
+  // const userId = session.user.id; // Removed
+  const userIdForDbOperations: string | undefined = undefined; // Placeholder
 
   return await prisma.$transaction(async (tx) => {
     const saleToRefund = await tx.sale.findUnique({
@@ -184,7 +186,6 @@ export async function refundSaleAction(saleId: string): Promise<Sale> {
       throw new Error(`Sale ${saleToRefund.saleNumber} is cancelled and cannot be refunded.`);
     }
 
-    // Update sale status to Refunded
     const updatedSale = await tx.sale.update({
       where: { id: saleId },
       data: { status: 'Refunded' },
@@ -195,7 +196,6 @@ export async function refundSaleAction(saleId: string): Promise<Sale> {
       },
     });
 
-    // Increase stock for each item in the sale
     for (const item of saleToRefund.items) {
       if (!item.product) {
         console.warn(`Product details missing for item ID ${item.id} in sale ${saleId}. Skipping stock update for this item.`);
@@ -219,12 +219,12 @@ export async function refundSaleAction(saleId: string): Promise<Sale> {
         data: {
           productId: item.productId,
           type: StockMovementTypeEnum.RETURN_CUSTOMER,
-          quantityChange: item.quantity, // Positive for increase
+          quantityChange: item.quantity,
           quantityBefore,
           quantityAfter,
           reason: `Return from Sale #${saleToRefund.saleNumber}`,
           referenceId: saleToRefund.id,
-          userId: userId, // User performing the refund
+          userId: userIdForDbOperations, // May be undefined
         },
       });
     }

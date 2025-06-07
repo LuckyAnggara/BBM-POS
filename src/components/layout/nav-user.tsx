@@ -2,14 +2,11 @@
 "use client"
 
 import {
-  BadgeCheck,
-  Bell,
   ChevronsUpDown,
-  CreditCard,
   LogOut,
-  Sparkles,
+  UserCircle as UserIcon // Using UserCircle as a generic icon
 } from "lucide-react"
-import { useSession, signOut } from "next-auth/react" // Import useSession and signOut
+// useSession and signOut removed
 import {
   Avatar,
   AvatarFallback,
@@ -31,26 +28,21 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-// import { logoutUser } from '@/app/auth/actions'; // Replaced by next-auth/react signOut
+// logoutUser action removed
 
-// NavUser props will now come from NextAuth session
+// NavUser no longer relies on NextAuth session
 export function NavUser() {
-  const { data: session } = useSession(); // Get session data
   const { isMobile } = useSidebar();
 
-  const user = session?.user;
+  // Placeholder content since there's no authenticated user
+  const userName = "Guest User";
+  const userEmail = "No session";
+  const fallbackName = "G";
 
-  if (!user) {
-    // Optionally, render a login button or nothing if user is not authenticated
-    return null; 
-  }
-
-  // Create a display name (e.g., first letter of name or email)
-  const fallbackName = user.name ? user.name.charAt(0).toUpperCase() : (user.email ? user.email.charAt(0).toUpperCase() : 'U');
-  const userAvatarUrl = user.image || undefined; // NextAuth uses 'image' for avatar
-
-  const handleLogout = async () => {
-    await signOut({ callbackUrl: '/login' }); // Redirect to login after sign out
+  const handleLoginRedirect = () => {
+    // In a real app without NextAuth, you might redirect to a custom login page
+    // or show a login modal. For now, this is a placeholder.
+    alert("Login functionality has been removed. Please implement a new authentication system if needed.");
   };
 
   return (
@@ -63,12 +55,12 @@ export function NavUser() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={userAvatarUrl} alt={user.name ?? "User"} />
-                <AvatarFallback className="rounded-lg">{fallbackName}</AvatarFallback>
+                {/* No userAvatarUrl, using fallback */}
+                <AvatarFallback className="rounded-lg bg-muted">{fallbackName}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name ?? 'User'}</span>
-                <span className="truncate text-xs">{user.email ?? ''}</span>
+                <span className="truncate font-medium">{userName}</span>
+                <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -82,41 +74,18 @@ export function NavUser() {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={userAvatarUrl} alt={user.name ?? "User"} />
-                  <AvatarFallback className="rounded-lg">{fallbackName}</AvatarFallback>
+                  <AvatarFallback className="rounded-lg bg-muted">{fallbackName}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name ?? 'User'}</span>
-                  <span className="truncate text-xs">{user.email ?? ''}</span>
+                  <span className="truncate font-medium">{userName}</span>
+                  <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
                 </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem disabled>
-                <Sparkles />
-                Upgrade to Pro
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem disabled>
-                <BadgeCheck />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled>
-                <CreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled>
-                <Bell />
-                Notifications
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+            <DropdownMenuItem onClick={handleLoginRedirect} className="cursor-pointer">
               <LogOut className="mr-2 h-4 w-4" /> 
-              Log out
+              Login (Placeholder)
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

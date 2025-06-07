@@ -4,9 +4,9 @@
 import { prisma } from '@/lib/prisma';
 import type { PurchaseOrder as AppPurchaseOrder, PurchaseOrderItem as AppPurchaseOrderItem, PurchaseOrderStatus, StockMovementTypeEnum, Product, Category, User as AppUser } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import type { PurchaseOrderFormValues } from './create/page';
+import type { PurchaseOrderFormValues } from './create/page'; 
 import { increaseProductStockAction } from '@/app/inventory/actions';
-import { getSession } from '@/lib/auth-utils'; // Import getSession
+// getSession import removed
 
 const mapPrismaProductToAppProductLocal = (prismaProduct: any): Product => {
   if (!prismaProduct) return undefined as unknown as Product;
@@ -37,12 +37,13 @@ const mapPrismaProductToAppProductLocal = (prismaProduct: any): Product => {
 
 const mapPrismaUserToAppUser = (prismaUser: any): AppUser | undefined => {
   if (!prismaUser) return undefined;
+  // Simplified User mapping as NextAuth is removed
   return {
     id: prismaUser.id,
     name: prismaUser.name,
     email: prismaUser.email,
-    role: prismaUser.role,
-    avatarUrl: prismaUser.avatarUrl ?? undefined,
+    role: prismaUser.role, // Assuming role is still part of your Prisma User model
+    avatarUrl: prismaUser.avatarUrl ?? undefined, // Or image from Prisma
     isActive: prismaUser.isActive,
     lastLogin: prismaUser.lastLogin?.toISOString() ?? null,
     createdAt: prismaUser.createdAt.toISOString(),
@@ -64,7 +65,7 @@ const mapPrismaPOToAppPO = (dbPO: any): AppPurchaseOrder => {
     taxes: dbPO.taxes ? dbPO.taxes.toNumber() : null,
     totalAmount: dbPO.totalAmount.toNumber(),
     notes: dbPO.notes ?? null,
-    createdById: dbPO.createdById,
+    createdById: dbPO.createdById, // This will be null or need a default if not set
     createdBy: dbPO.createdBy ? mapPrismaUserToAppUser(dbPO.createdBy) : undefined,
     createdAt: dbPO.createdAt.toISOString(),
     updatedAt: dbPO.updatedAt.toISOString(),
@@ -117,13 +118,18 @@ export async function fetchPurchaseOrderById(id: string): Promise<AppPurchaseOrd
   }
 }
 
-// createdById removed from parameters, will be fetched from session
 export async function createPurchaseOrder(data: PurchaseOrderFormValues): Promise<AppPurchaseOrder> {
-  const session = await getSession();
-  if (!session?.user?.id) {
-    throw new Error("User not authenticated or session invalid.");
+  // const session = await getSession(); // Removed
+  // if (!session?.user?.id) { // Removed
+  //   throw new Error("User not authenticated or session invalid.");
+  // }
+  // const createdById = session.user.id; // Removed
+  const createdByIdForDbOperations: string | undefined = undefined; // Placeholder
+
+  if (!createdByIdForDbOperations) {
+      console.warn("Creating Purchase Order without a user context. 'createdById' will be undefined.");
+      // Depending on schema, this might fail if createdById is mandatory.
   }
-  const createdById = session.user.id;
 
   try {
     const { items, poNumber, supplierName, orderDate, expectedDeliveryDate, status, discountAmount, shippingCost, taxes, notes } = data;
@@ -146,7 +152,7 @@ export async function createPurchaseOrder(data: PurchaseOrderFormValues): Promis
         taxes: finalTaxes,
         totalAmount,
         notes,
-        createdById, // Use createdById from session
+        createdById: createdByIdForDbOperations, // May be undefined
         items: {
           create: items.map(item => ({
             productId: item.productId,
@@ -170,7 +176,6 @@ export async function createPurchaseOrder(data: PurchaseOrderFormValues): Promis
 }
 
 export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormValues): Promise<AppPurchaseOrder> {
-  // createdById is implicit in the existing PO, not changed on update via this form usually
   try {
     const { items, poNumber, supplierName, orderDate, expectedDeliveryDate, status, discountAmount, shippingCost, taxes, notes } = data;
 
@@ -228,8 +233,6 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
 
 export async function deletePurchaseOrderById(id: string): Promise<void> {
   try {
-    // First delete related stock movements if any, or handle according to your app's logic
-    // await prisma.stockMovement.deleteMany({ where: { referenceId: id, type: 'PURCHASE_RECEIPT' }}); // Example
     await prisma.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: id } });
     await prisma.purchaseOrder.delete({
       where: { id },
@@ -242,10 +245,9 @@ export async function deletePurchaseOrderById(id: string): Promise<void> {
 }
 
 export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrderStatus, itemsToReceive?: AppPurchaseOrderItem[]): Promise<AppPurchaseOrder> {
-  const session = await getSession();
-  // userId for stock movement logging will come from session
-  const userIdForMovement = session?.user?.id;
-
+  // const session = await getSession(); // Removed
+  // const userIdForMovement = session?.user?.id; // Removed
+  const userIdForMovement: string | undefined = undefined; // Placeholder
 
   return await prisma.$transaction(async (tx) => {
     const po = await tx.purchaseOrder.findUnique({
@@ -277,7 +279,7 @@ export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrde
             'PURCHASE_RECEIPT',
             `Received from PO #${po.poNumber}`,
             po.id,
-            userIdForMovement // Use session user ID for who initiated stock update
+            userIdForMovement // May be undefined
           );
         } else {
           console.warn(`Item ${item.productName} is missing an ID, cannot update quantityReceived or stock.`);

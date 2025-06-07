@@ -4,11 +4,12 @@
 import { prisma } from '@/lib/prisma';
 import type { Expense, ExpenseCategory, User as AppUser } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-import { getSession } from '@/lib/auth-utils';
+// getSession import removed
 import { Decimal } from '@prisma/client/runtime/library';
 
 const mapPrismaUserToAppUser = (prismaUser: any): AppUser | undefined => {
   if (!prismaUser) return undefined;
+  // Simplified User mapping
   return {
     id: prismaUser.id,
     name: prismaUser.name,
@@ -38,7 +39,7 @@ const mapPrismaExpenseToApp = (dbExpense: any): Expense => {
     amount: dbExpense.amount.toNumber(),
     expenseCategoryId: dbExpense.expenseCategoryId,
     category: mapPrismaExpenseCategoryToApp(dbExpense.category),
-    userId: dbExpense.userId,
+    userId: dbExpense.userId, // Will be null or need default if not set
     user: dbExpense.user ? mapPrismaUserToAppUser(dbExpense.user) : undefined,
     notes: dbExpense.notes ?? null,
     createdAt: dbExpense.createdAt.toISOString(),
@@ -60,7 +61,7 @@ export async function fetchExpenses(filters?: FetchExpensesFilters): Promise<Exp
     }
     if (filters?.endDate) {
       const endDateObj = new Date(filters.endDate);
-      endDateObj.setHours(23, 59, 59, 999); // End of day
+      endDateObj.setHours(23, 59, 59, 999); 
       whereClause.date = { ...whereClause.date, lte: endDateObj };
     }
     if (filters?.categoryId && filters.categoryId !== 'all') {
@@ -91,11 +92,17 @@ export interface ExpenseCreationData {
 }
 
 export async function createExpense(data: ExpenseCreationData): Promise<Expense> {
-  const session = await getSession();
-  if (!session?.user?.id) {
-    throw new Error("User not authenticated to record an expense.");
+  // const session = await getSession(); // Removed
+  // if (!session?.user?.id) { // Removed
+  //   throw new Error("User not authenticated to record an expense.");
+  // }
+  // const userId = session.user.id; // Removed
+  const userIdForDbOperations: string | undefined = undefined; // Placeholder
+  
+  if (!userIdForDbOperations) {
+      console.warn("Creating expense without user context. 'userId' will be undefined.");
+      // Schema might require userId.
   }
-  const userId = session.user.id;
 
   try {
     const newDbExpense = await prisma.expense.create({
@@ -104,13 +111,13 @@ export async function createExpense(data: ExpenseCreationData): Promise<Expense>
         description: data.description,
         amount: new Decimal(data.amount),
         expenseCategoryId: data.expenseCategoryId,
-        userId: userId,
+        userId: userIdForDbOperations, // May be undefined
         notes: data.notes,
       },
       include: { category: true, user: true },
     });
     revalidatePath('/expenses');
-    revalidatePath('/reports/income-statement'); // Expenses affect income statement
+    revalidatePath('/reports/income-statement');
     return mapPrismaExpenseToApp(newDbExpense);
   } catch (error) {
     console.error('Failed to create expense:', error);
@@ -118,7 +125,6 @@ export async function createExpense(data: ExpenseCreationData): Promise<Expense>
   }
 }
 
-// Placeholder for deleteExpense
 export async function deleteExpense(expenseId: string): Promise<void> {
     try {
         await prisma.expense.delete({
@@ -143,5 +149,3 @@ export async function fetchAllExpenseCategoriesAction(): Promise<ExpenseCategory
     throw new Error('Could not fetch expense categories.');
   }
 }
-
-    

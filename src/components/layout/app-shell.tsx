@@ -29,13 +29,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { TeamSwitcher } from './team-switcher';
 import { NavUser } from './nav-user';
-import type { User } from '@/lib/types';
+// User prop and type import removed as authentication is removed.
+// import type { User } from '@/lib/types'; 
 import { sidebarNavGroups, standaloneNavItems, type NavItem, type NavSubItem } from './nav-items.tsx'; 
 import { PageTitleProvider, useCurrentPageTitle } from './page-title-context';
 
 interface AppShellProps {
   children: ReactNode;
-  user: User;
+  // user prop removed
 }
 
 const shopData = {
@@ -92,7 +93,7 @@ function NavItemDisplay({ item, pathname }: { item: NavItem; pathname: string })
 }
 
 // Inner component to consume context
-function AppShellLayout({ children, user }: AppShellProps) {
+function AppShellLayout({ children }: AppShellProps) { // user prop removed
   const pathname = usePathname();
   const pageTitle = useCurrentPageTitle();
 
@@ -124,7 +125,7 @@ function AppShellLayout({ children, user }: AppShellProps) {
            </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <NavUser user={user} />
+          <NavUser /> {/* NavUser no longer receives user prop */}
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
@@ -140,10 +141,7 @@ function AppShellLayout({ children, user }: AppShellProps) {
           {pageTitle && <h1 className="text-xl font-semibold font-headline truncate">{pageTitle}</h1>}
         </header>
         <main className="flex-1 p-4 md:p-6 overflow-auto bg-muted/30">
-          {/* Height adjustment for sticky header, this might need fine-tuning based on actual header height */}
-          {/* <div style={{ paddingTop: '64px' }}>  // Adjust 64px if header height changes */}
             {children}
-          {/* </div> */}
         </main>
       </SidebarInset>
     </SidebarProvider>
@@ -151,10 +149,10 @@ function AppShellLayout({ children, user }: AppShellProps) {
 }
 
 
-export function AppShell({ children, user }: AppShellProps) {
+export function AppShell({ children }: AppShellProps) { // user prop removed
   return (
     <PageTitleProvider>
-      <AppShellLayout user={user}>{children}</AppShellLayout>
+      <AppShellLayout>{children}</AppShellLayout> {/* user prop removed */}
     </PageTitleProvider>
   );
 }

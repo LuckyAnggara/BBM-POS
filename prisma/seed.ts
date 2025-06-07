@@ -1,31 +1,31 @@
 
 import { PrismaClient, Category, Product, User, Sale, PurchaseOrder } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import bcrypt from 'bcryptjs';
+// import bcrypt from 'bcryptjs'; // bcrypt removed
 
 const prisma = new PrismaClient();
 
-const saltRounds = 10;
+// const saltRounds = 10; // bcrypt salt rounds removed
 
 async function seedUsers() {
-  const adminPasswordPlain = "password123";
-  const staffPasswordPlain = "staffpass";
+  // const adminPasswordPlain = "password123"; // Removed
+  // const staffPasswordPlain = "staffpass"; // Removed
 
-  const adminPasswordHash = bcrypt.hashSync(adminPasswordPlain, saltRounds);
-  const staffPasswordHash = bcrypt.hashSync(staffPasswordPlain, saltRounds);
+  // const adminPasswordHash = bcrypt.hashSync(adminPasswordPlain, saltRounds); // Removed
+  // const staffPasswordHash = bcrypt.hashSync(staffPasswordPlain, saltRounds); // Removed
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
     update: {
       name: 'Admin User Alice',
       role: 'ADMIN',
-      // password: adminPasswordHash, // Optionally update password if user exists
+      // password field removed
     },
     create: {
-      id: 'user_admin_alice', // Keep custom ID for consistency if needed
+      id: 'user_admin_alice',
       name: 'Admin User Alice',
       email: 'admin@example.com',
-      password: adminPasswordHash,
+      // password: adminPasswordHash, // password field removed
       role: 'ADMIN',
       isActive: true,
       image: 'https://placehold.co/80x80/7F56D9/FFFFFF.png?text=AA'
@@ -37,13 +37,13 @@ async function seedUsers() {
     update: {
       name: 'Staff User Charlie',
       role: 'STAFF',
-      // password: staffPasswordHash, // Optionally update password
+      // password field removed
     },
     create: {
-      id: 'user_staff_charlie', // Keep custom ID for consistency if needed
+      id: 'user_staff_charlie',
       name: 'Staff User Charlie',
       email: 'staff@example.com',
-      password: staffPasswordHash,
+      // password: staffPasswordHash, // password field removed
       role: 'STAFF',
       isActive: true,
       image: 'https://placehold.co/80x80/64748B/FFFFFF.png?text=SC'
@@ -133,7 +133,7 @@ async function seedPurchaseOrders(users: Record<string, User>, products: Record<
       orderDate: new Date(),
       status: 'Ordered',
       totalAmount: new Decimal(300),
-      createdById: users.admin.id,
+      createdById: users.admin.id, // Assuming User model and admin user still exist
       items: {
         create: [{
           productId: products.product1.id,
@@ -168,7 +168,7 @@ async function seedSales(users: Record<string, User>, products: Record<string, P
       saleDate: new Date(),
       customerId: customer.id,
       customerName: customer.name,
-      userId: users.staff.id,
+      userId: users.staff.id, // Assuming User model and staff user still exist
       subtotal: new Decimal(31.98),
       discountAmount: new Decimal(0),
       taxPercent: new Decimal(10),
@@ -218,7 +218,7 @@ async function seedStockMovements(
         quantityAfter: 80,
         reason: `PO #${purchaseOrders.po.poNumber} Received`,
         referenceId: purchaseOrders.po.id,
-        userId: users.admin.id,
+        userId: users.admin.id, // Assuming User model and admin user still exist
       },
       {
         productId: products.product1.id,
@@ -228,7 +228,7 @@ async function seedStockMovements(
         quantityAfter: 78,
         reason: `Sale #${sales.sale.saleNumber}`,
         referenceId: sales.sale.id,
-        userId: users.staff.id,
+        userId: users.staff.id, // Assuming User model and staff user still exist
       },
     ],
   });

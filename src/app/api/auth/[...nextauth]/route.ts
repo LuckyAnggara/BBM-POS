@@ -1,6 +1,2 @@
-import NextAuth from 'next-auth';
-import { authConfig } from '@/lib/auth';
-
-const handler = NextAuth(authConfig);
-
-export { handler as GET, handler as POST };
+// This NextAuth.js API route handler has been removed
+// as NextAuth.js is no longer used in this project.

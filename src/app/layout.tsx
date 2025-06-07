@@ -41,8 +41,9 @@ export default async function RootLayout({
         {user ? (
           <SidebarProvider>
             <AppShell user={user}>
+            {/* <SidebarTrigger className="-ml-1" /> */}
+
               {children}
-              <SidebarTrigger className="-ml-1" />
               <SonnerToaster richColors position="top-right" />
             </AppShell>
           </SidebarProvider>

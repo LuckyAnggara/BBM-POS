@@ -11,6 +11,8 @@ export async function getSession(): Promise<{ user: SessionPayload; session: str
   const cookieStore = cookies();
   const sessionCookie = cookieStore.get('auth_session');
 
+  console.log(sessionCookie)
+
   if (!sessionCookie?.value) {
     return null;
   }

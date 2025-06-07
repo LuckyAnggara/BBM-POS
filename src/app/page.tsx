@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, Package, ShoppingCart, Users, Warehouse, ClipboardList } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
-import { useCartStore } from "@/store/cart-store"; // Assuming you might want cart info or this is a general pattern
+import { useCartStore } from "@/store/cart-store"; 
+import { usePageTitle } from '@/components/layout/page-title-context'; // Import the hook
 
 interface StatCardProps {
   title: string;
@@ -29,8 +30,8 @@ function StatCard({ title, value, icon: Icon, description }: StatCardProps) {
 }
 
 export default function DashboardPage() {
+  usePageTitle('Dashboard'); // Set the page title
   const { products, fetchProducts, isLoading: inventoryLoading } = useInventoryStore();
-  // Example: const { items: cartItems } = useCartStore();
 
   useEffect(() => {
     fetchProducts();
@@ -41,14 +42,13 @@ export default function DashboardPage() {
   const totalStockQuantity = safeProducts.reduce((sum, p) => sum + p.quantity, 0);
   const totalStockValue = safeProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
 
-  // Placeholder data for other stats until their stores are implemented
   const totalSalesToday = 1250.75;
   const pendingOrders = 5;
 
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-3xl font-headline font-semibold">Dashboard</h1>
+      {/* The h1 title is now rendered in AppShell header */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Revenue (Today)"

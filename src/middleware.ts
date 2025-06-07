@@ -2,8 +2,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const PROTECTED_ROUTES = ['/', '/inventory', '/admin', '/pos', '/purchasing', '/sales']; // Add all routes that need auth
+// const PROTECTED_ROUTES = ['/']; 
+const PROTECTED_ROUTES = ['/', '/inventory', '/admin', '/pos', '/purchasing', '/sales'];// Add all routes that need auth
 const PUBLIC_ROUTES = ['/login']; // Routes accessible without auth
+// const PUBLIC_ROUTES = ['/login', '/inventory', '/admin', '/pos', '/purchasing', '/sales']; // Routes accessible without auth
 
 export function middleware(request: NextRequest) {
   console.log('aaaaaaaaaaaaa')

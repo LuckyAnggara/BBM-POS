@@ -9,18 +9,20 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarRail,
+  SidebarInset,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarMenuSub,
   SidebarMenuSubButton,
-  SidebarMenuSubItem, // Added SidebarMenuSubItem here
+  SidebarMenuSubItem,
   SidebarGroup,
+  SidebarTrigger,
   SidebarGroupLabel,
   useSidebar, 
 } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-
+import { Separator} from '@/components/ui/separator'
 
 import { ChevronRight, type LucideIcon } from 'lucide-react';
 import Link from 'next/link'; 
@@ -29,23 +31,21 @@ import { TeamSwitcher } from './team-switcher';
 import { NavUser } from './nav-user';
 import type { User } from '@/lib/types';
 import { sidebarNavGroups, standaloneNavItems, type NavItem, type NavSubItem } from './nav-items.tsx'; 
+import { PageTitleProvider, useCurrentPageTitle } from './page-title-context';
 
 interface AppShellProps {
   children: ReactNode;
   user: User;
 }
 
-// Dummy shop data for TeamSwitcher, replace with actual data if needed
 const shopData = {
   name: 'StockPilot POS',
-  // logo: BuildingIcon, // Assuming BuildingIcon is defined or imported
 };
 
 
 function NavItemDisplay({ item, pathname }: { item: NavItem; pathname: string }) {
   const { isMobile } = useSidebar(); 
 
-  // Determine if item is active based on its own isActive or subItems' isActive
   const isActive = item.isActive ? item.isActive(pathname) : 
                   item.subItems?.some(sub => sub.isActive ? sub.isActive(pathname) : pathname === sub.href);
 
@@ -91,9 +91,10 @@ function NavItemDisplay({ item, pathname }: { item: NavItem; pathname: string })
   );
 }
 
-
-export function AppShell({ children, user }: AppShellProps) {
+// Inner component to consume context
+function AppShellLayout({ children, user }: AppShellProps) {
   const pathname = usePathname();
+  const pageTitle = useCurrentPageTitle();
 
   return (
     <SidebarProvider defaultOpen>
@@ -127,10 +128,33 @@ export function AppShell({ children, user }: AppShellProps) {
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
-      {/* Main content area, ensuring it takes up remaining space and is scrollable if needed */}
-      <main className="flex-1 p-4 md:p-6 overflow-auto bg-muted/30">
-        {children}
-      </main>
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4 sticky top-0 z-30">
+          <div className="flex items-center"> 
+            <SidebarTrigger className="-ml-1" /> 
+            <Separator
+              orientation="vertical"
+              className="mx-2 data-[orientation=vertical]:h-6" 
+            />
+          </div>
+          {pageTitle && <h1 className="text-xl font-semibold font-headline truncate">{pageTitle}</h1>}
+        </header>
+        <main className="flex-1 p-4 md:p-6 overflow-auto bg-muted/30">
+          {/* Height adjustment for sticky header, this might need fine-tuning based on actual header height */}
+          {/* <div style={{ paddingTop: '64px' }}>  // Adjust 64px if header height changes */}
+            {children}
+          {/* </div> */}
+        </main>
+      </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+
+export function AppShell({ children, user }: AppShellProps) {
+  return (
+    <PageTitleProvider>
+      <AppShellLayout user={user}>{children}</AppShellLayout>
+    </PageTitleProvider>
   );
 }

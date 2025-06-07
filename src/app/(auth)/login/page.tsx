@@ -25,10 +25,8 @@ export default function LoginPage() {
       const result = await loginUser(email, password); 
       if (result.success) {
         toast.success(result.message || 'Login successful! Redirecting...');
-        // Wait for toast to show then refresh and push
-        // router.refresh() will re-fetch server components including NavUser
         router.refresh(); 
-        router.push('/'); 
+        router.push('/dashboard'); // Redirect to /dashboard
       } else {
         toast.error(result.error || 'Login failed. Please check your credentials.');
       }

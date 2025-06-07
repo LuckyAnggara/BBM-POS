@@ -17,8 +17,8 @@ import {
   Plus,
   History as HistoryIcon,
   FileText,
-  ReceiptText, // For Expenses
-  WalletCards, // For Expense Categories
+  ReceiptText, 
+  WalletCards, 
 } from 'lucide-react';
 
 export interface NavSubItem {
@@ -49,8 +49,8 @@ export const sidebarNavGroups: NavGroup[] = [
       {
         label: 'Dashboard',
         icon: LayoutDashboard,
-        href: '/',
-        isActive: (pathname) => pathname === '/',
+        href: '/dashboard', // Changed from '/'
+        isActive: (pathname) => pathname === '/dashboard', // Changed from '/'
       },
       {
         label: 'Inventory',
@@ -66,7 +66,7 @@ export const sidebarNavGroups: NavGroup[] = [
           {
             href: '/inventory/add',
             label: 'Add New Product',
-            icon: Package, // Assuming PlusCircle was a placeholder and Package is more suitable
+            icon: Package, 
             isActive: (pathname) => pathname === '/inventory/add',
           },
         ],
@@ -82,12 +82,12 @@ export const sidebarNavGroups: NavGroup[] = [
         isActive: (pathname) => pathname.startsWith('/sales'),
       },
       {
-        label: 'Expenses', // New Expenses Module
+        label: 'Expenses', 
         icon: ReceiptText,
         isInitiallyOpen: false,
         subItems: [
           { href: '/expenses', label: 'Expense Log', icon: HistoryIcon },
-          { href: '/expenses/add', label: 'Add New Expense', icon: Plus }, // Using the helper below
+          { href: '/expenses/add', label: 'Add New Expense', icon: Plus }, 
         ],
         isActive: (pathname) => pathname.startsWith('/expenses'),
       },

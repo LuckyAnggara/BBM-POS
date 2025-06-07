@@ -1,112 +1,55 @@
 
 'use client';
-import { useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Package, ShoppingCart, Users, Warehouse, ClipboardList } from "lucide-react";
-import { useInventoryStore } from "@/store/inventory-store";
-import { useCartStore } from "@/store/cart-store"; 
-import { usePageTitle } from '@/components/layout/page-title-context'; // Import the hook
 
-interface StatCardProps {
-  title: string;
-  value: string;
-  icon: React.ElementType;
-  description: string;
-}
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { LogIn } from 'lucide-react';
 
-function StatCard({ title, value, icon: Icon, description }: StatCardProps) {
+export default function RootPage() {
+  // This page serves as the landing page for the root path '/'.
+  // It should not use hooks like usePageTitle that depend on AppShell's context.
+  // The actual dashboard is served by src/app/(app)/page.tsx for authenticated users.
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold font-headline">{value}</div>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-export default function DashboardPage() {
-  usePageTitle('Dashboard'); // Set the page title
-  const { products, fetchProducts, isLoading: inventoryLoading } = useInventoryStore();
-
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
-
-  const safeProducts = products || [];
-  const totalProducts = safeProducts.length;
-  const totalStockQuantity = safeProducts.reduce((sum, p) => sum + p.quantity, 0);
-  const totalStockValue = safeProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
-
-  const totalSalesToday = 1250.75;
-  const pendingOrders = 5;
-
-
-  return (
-    <div className="flex flex-col gap-6">
-      {/* The h1 title is now rendered in AppShell header */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Revenue (Today)"
-          value={`$${totalSalesToday.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          icon={DollarSign}
-          description="+20.1% from last month"
-        />
-        <StatCard
-          title="Total Products"
-          value={inventoryLoading ? "Loading..." : totalProducts.toString()}
-          icon={Package}
-          description="Number of unique SKUs"
-        />
-        <StatCard
-          title="Total Stock Quantity"
-          value={inventoryLoading ? "Loading..." : totalStockQuantity.toLocaleString()}
-          icon={Warehouse}
-          description="Sum of all product quantities"
-        />
-         <StatCard
-          title="Pending Purchase Orders"
-          value={pendingOrders.toString()}
-          icon={ClipboardList}
-          description="Awaiting fulfillment"
-        />
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted/40 p-6 text-center">
+      <div className="mb-8">
+        {/* You can place a logo here if desired */}
+        {/* Example: <img src="/logo.svg" alt="StockPilot Logo" className="h-16 w-auto mx-auto" /> */}
+        <svg
+          className="mx-auto h-16 w-auto text-primary mb-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          data-ai-hint="application logo"
+        >
+          <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+          <path d="M2 17l10 5 10-5"></path>
+          <path d="M2 12l10 5 10-5"></path>
+        </svg>
+        <h1 className="text-4xl md:text-5xl font-bold font-headline text-foreground mb-3">
+          Welcome to StockPilot
+        </h1>
+        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+          Streamline your inventory, manage sales with our intuitive Point of Sale, and simplify your purchasing process.
+        </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline">Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">No recent activity to display yet.</p>
-            {/* Placeholder for recent activity feed */}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline">Low Stock Items</CardTitle>
-          </CardHeader>
-          <CardContent>
-          {inventoryLoading ? <p>Loading...</p> : 
-            (safeProducts || []).filter(p => p.lowStockThreshold && p.quantity < p.lowStockThreshold).length > 0 ? (
-              <ul className="space-y-2">
-                {(safeProducts || []).filter(p => p.lowStockThreshold && p.quantity < p.lowStockThreshold).slice(0,5).map(p => (
-                  <li key={p.id} className="text-sm flex justify-between">
-                    <span>{p.name}</span>
-                    <span className="font-semibold text-destructive">{p.quantity} left</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground">All products are well-stocked.</p>
-            )
-          }
-          </CardContent>
-        </Card>
+
+      <div className="space-y-4">
+        <Button asChild size="lg" className="text-base px-8 py-6">
+          <Link href="/login">
+            <LogIn className="mr-2 h-5 w-5" /> Get Started / Login
+          </Link>
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          Access your dashboard and manage your business operations.
+        </p>
       </div>
+
+      <footer className="absolute bottom-6 text-center w-full text-xs text-muted-foreground">
+        <p>&copy; {new Date().getFullYear()} StockPilot. All rights reserved.</p>
+      </footer>
     </div>
   );
 }

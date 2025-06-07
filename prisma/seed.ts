@@ -1,16 +1,23 @@
 
 import { PrismaClient, Category, Product, User, Sale, PurchaseOrder } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+const SALT_ROUNDS = 10; // Standard salt rounds for bcrypt
+
 async function seedUsers() {
   console.log('Seeding users...');
+  const adminPassword = await bcrypt.hash('adminpassword', SALT_ROUNDS);
+  const staffPassword = await bcrypt.hash('staffpassword', SALT_ROUNDS);
+
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
     update: {
       name: 'Admin User Alice',
       role: 'ADMIN',
+      password: adminPassword, // Ensure password field exists in your User model
     },
     create: {
       id: 'user_admin_alice',
@@ -18,7 +25,8 @@ async function seedUsers() {
       email: 'admin@example.com',
       role: 'ADMIN',
       isActive: true,
-      image: 'https://placehold.co/80x80/7F56D9/FFFFFF.png?text=AA'
+      image: 'https://placehold.co/80x80/7F56D9/FFFFFF.png?text=AA',
+      password: adminPassword, // Ensure password field exists
     },
   });
 
@@ -27,6 +35,7 @@ async function seedUsers() {
     update: {
       name: 'Staff User Charlie',
       role: 'STAFF',
+      password: staffPassword, // Ensure password field exists
     },
     create: {
       id: 'user_staff_charlie',
@@ -34,10 +43,11 @@ async function seedUsers() {
       email: 'staff@example.com',
       role: 'STAFF',
       isActive: true,
-      image: 'https://placehold.co/80x80/64748B/FFFFFF.png?text=SC'
+      image: 'https://placehold.co/80x80/64748B/FFFFFF.png?text=SC',
+      password: staffPassword, // Ensure password field exists
     },
   });
-  console.log('Users seeded:', { admin, staff });
+  console.log('Users seeded (passwords are hashed).');
   return { admin, staff };
 }
 
@@ -208,7 +218,7 @@ async function seedStockMovements(
         productId: products.product1.id,
         type: 'PURCHASE_RECEIPT',
         quantityChange: 30,
-        quantityBefore: 50, // Assuming initial quantity was 50 before this PO
+        quantityBefore: 50, 
         quantityAfter: 80,
         reason: `PO #${purchaseOrders.po.poNumber} Received`,
         referenceId: purchaseOrders.po.id,
@@ -218,7 +228,7 @@ async function seedStockMovements(
         productId: products.product1.id,
         type: 'SALE',
         quantityChange: -2,
-        quantityBefore: 80, // Quantity after the PO receipt
+        quantityBefore: 80, 
         quantityAfter: 78,
         reason: `Sale #${sales.sale.saleNumber}`,
         referenceId: sales.sale.id,
@@ -253,7 +263,6 @@ async function main() {
   const categories = await seedCategories();
   const productsData = await seedProducts(categories);
   
-  // Reset product1 quantity to a known state before PO and Sale simulation
   await prisma.product.update({
     where: { id: productsData.product1.id },
     data: { quantity: 50 } 
@@ -273,5 +282,3 @@ main()
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());
-
-    

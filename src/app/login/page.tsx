@@ -9,29 +9,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
 import { loginUser } from './actions';
-import { LogIn, Mail, Loader2 } from 'lucide-react';
+import { LogIn, Mail, KeyRound, Loader2 } from 'lucide-react'; // Added KeyRound for password
 import Link from 'next/link';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState(''); // Added password state
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
     try {
-      const result = await loginUser(email);
+      // Pass email and password to loginUser action
+      const result = await loginUser(email, password); 
       if (result.success) {
         toast.success(result.message || 'Login successful! Redirecting...');
-        // Redirect to dashboard or intended page after login
-        // Wait for toast to show then redirect
         setTimeout(() => {
           router.push('/'); 
-          router.refresh(); // Important to refresh layout and potentially NavUser
+          router.refresh(); 
         }, 1000);
       } else {
-        toast.error(result.error || 'Login failed. Please check your email.');
+        toast.error(result.error || 'Login failed. Please check your credentials.');
       }
     } catch (error) {
       toast.error('An unexpected error occurred during login.');
@@ -50,8 +50,7 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-headline">Welcome Back!</CardTitle>
           <CardDescription>
-            Enter your email to log in to your StockPilot account.
-            (Password check is not implemented in this basic version).
+            Enter your email and password to log in to your StockPilot account.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -70,15 +69,28 @@ export default function LoginPage() {
                 disabled={isLoading}
               />
             </div>
-            {/* Password field could be added here if desired */}
+            <div className="space-y-2"> {/* Added password field */}
+              <Label htmlFor="password" className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-muted-foreground"/> Password
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+            </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-3">
-            <Button type="submit" className="w-full" disabled={isLoading || !email}>
+            <Button type="submit" className="w-full" disabled={isLoading || !email || !password}>
               {isLoading ? <Loader2 className="animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
               {isLoading ? 'Logging in...' : 'Log In'}
             </Button>
             <p className="text-xs text-muted-foreground">
-              Don&apos;t have an account? Contact admin.
+              Sample users: admin@example.com (adminpassword) or staff@example.com (staffpassword)
             </p>
              <Link href="/" className="text-xs text-primary hover:underline">
                 Back to Homepage
@@ -89,5 +101,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    

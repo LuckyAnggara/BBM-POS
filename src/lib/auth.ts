@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import type { User as PrismaUser } from '@prisma/client'; // Use PrismaUser type for authorize
 
 export const authConfig: NextAuthConfig = {
+  debug:true,
   adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
@@ -54,7 +55,7 @@ export const authConfig: NextAuthConfig = {
           email: user.email,
           image: user.image,
           role: user.role, // Include custom role
-          isActive: user.isActive,
+          isActive: user.isActive as boolean, // Explicitly cast to boolean
         };
       },
     }),
@@ -68,7 +69,7 @@ export const authConfig: NextAuthConfig = {
       if (user) {
         token.id = user.id; // id from authorize user object
         token.role = (user as any).role; // role from authorize user object
-        token.isActive = (user as any).isActive;
+        token.isActive = Boolean((user as any).isActive); // Ensure it's a boolean
       }
       return token;
     },
@@ -76,7 +77,7 @@ export const authConfig: NextAuthConfig = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
-        session.user.isActive = token.isActive as boolean;
+        session.user.isActive = Boolean(token.isActive); // Ensure it's a boolean
         // You can add other properties from token to session.user if needed
       }
       return session;
@@ -84,9 +85,9 @@ export const authConfig: NextAuthConfig = {
   },
   pages: {
     signIn: '/login',
-    // error: '/auth/error', // Optional: custom error page
+    error: '/auth/error', // Optional: custom error page
   },
-  // secret: process.env.AUTH_SECRET, // Ensure AUTH_SECRET is set in .env
+  secret: process.env.AUTH_SECRET, // Ensure AUTH_SECRET is set in .env
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);

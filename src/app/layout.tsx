@@ -27,9 +27,9 @@ export default async function RootLayout({
     id: user.id,
     name: user.name ?? 'User',
     email: user.email ?? '',
-    role: user.role ?? 'STAFF', // Default role if not present
-    avatarUrl: user.image, // NextAuth uses 'image' for avatar
-    isActive: user.isActive ?? false,
+    role: user.role ?? 'STAFF',
+    avatarUrl: user.image,
+    isActive: Boolean(user.isActive), // Ensure isActive is a boolean
     // These might not be directly available from NextAuth session user
     // Ensure your callbacks populate them if they are strictly needed by AppShell
     // Or make them optional in AppShell's user prop type.

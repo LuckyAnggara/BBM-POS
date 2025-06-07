@@ -28,7 +28,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useEffect, useState } from "react";
-import { getSessionDataFromServer, logoutUser } from "@/app/login/actions"; // Import server actions
+import { getSessionDataFromServer, logoutUser } from "@/app/(auth)/login/actions"; // Corrected import path
 import type { UserSessionData } from "@/lib/user-session";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -39,7 +39,7 @@ export function NavUser() {
   const [session, setSession] = useState<UserSessionData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // This effect runs client-side. 
+  // This effect runs client-side.
   // To get session data, we'd ideally pass it from a server component
   // or make a client-side API call if cookies are httpOnly.
   // For this example, we'll try to fetch it (though getSessionDataFromServer is a server action).
@@ -54,7 +54,7 @@ export function NavUser() {
     async function fetchSession() {
       setIsLoading(true);
       // Calling a server action from a client component like this is fine.
-      const serverSession = await getSessionDataFromServer(); 
+      const serverSession = await getSessionDataFromServer();
       setSession(serverSession);
       setIsLoading(false);
     }
@@ -98,7 +98,7 @@ export function NavUser() {
       </SidebarMenu>
     );
   }
-  
+
   const fallbackName = session.userName ? session.userName.charAt(0).toUpperCase() : "U";
 
   return (
@@ -145,7 +145,7 @@ export function NavUser() {
             </DropdownMenuItem>
             <DropdownMenuSeparator /> */}
             <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive-foreground focus:bg-destructive">
-              <LogOut className="mr-2 h-4 w-4" /> 
+              <LogOut className="mr-2 h-4 w-4" />
               Logout
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -154,5 +154,3 @@ export function NavUser() {
     </SidebarMenu>
   );
 }
-
-    

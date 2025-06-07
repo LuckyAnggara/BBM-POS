@@ -1,6 +1,6 @@
 
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react'; // Added useState
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,8 @@ type NotificationSettingsValues = z.infer<typeof notificationSettingsSchema>;
 
 export default function SettingsPage() {
   usePageTitle('System Settings');
+  const [isPageLoading, setIsPageLoading] = useState(true); // New state for initial load
+
   const generalForm = useForm<GeneralSettingsValues>({
     resolver: zodResolver(generalSettingsSchema),
     // Default values will be loaded from DB
@@ -66,8 +68,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     async function loadSettings() {
-      generalForm.control._setFormState({ isLoading: true });
-      notificationForm.control._setFormState({ isLoading: true });
+      setIsPageLoading(true); // Use local state
       try {
         const settings = await fetchAppSettings();
         generalForm.reset({
@@ -86,39 +87,35 @@ export default function SettingsPage() {
         toast.error("Failed to load settings.");
         console.error(error);
       } finally {
-        generalForm.control._setFormState({ isLoading: false });
-        notificationForm.control._setFormState({ isLoading: false });
+        setIsPageLoading(false); // Use local state
       }
     }
     loadSettings();
-  }, [generalForm, notificationForm]);
+  }, [generalForm, notificationForm]); // Dependencies remain the same
 
   const onGeneralSubmit: SubmitHandler<GeneralSettingsValues> = async (data) => {
-    generalForm.control._setFormState({ isSubmitting: true });
+    // react-hook-form's formState.isSubmitting will be true while this async function runs
     try {
       await saveAppSettings(data);
       toast.success("General settings saved successfully!");
     } catch (error) {
       toast.error("Failed to save general settings.");
-    } finally {
-      generalForm.control._setFormState({ isSubmitting: false });
     }
+    // No need to manually set isSubmitting to false, RHF handles it
   };
   
   const onNotificationSubmit: SubmitHandler<NotificationSettingsValues> = async (data) => {
-    notificationForm.control._setFormState({ isSubmitting: true });
+    // react-hook-form's formState.isSubmitting will be true
     try {
       await saveAppSettings(data);
       toast.success("Notification settings saved successfully!");
     } catch (error) {
        toast.error("Failed to save notification settings.");
-    } finally {
-      notificationForm.control._setFormState({ isSubmitting: false });
     }
+    // No need to manually set isSubmitting to false
   };
   
-  const isGeneralLoading = generalForm.formState.isLoading;
-  const isNotificationLoading = notificationForm.formState.isLoading;
+  // Use react-hook-form's built-in isSubmitting
   const isGeneralSubmitting = generalForm.formState.isSubmitting;
   const isNotificationSubmitting = notificationForm.formState.isSubmitting;
 
@@ -141,7 +138,7 @@ export default function SettingsPage() {
                 <CardDescription>Basic application settings including default tax rate.</CardDescription>
               </CardHeader>
               <CardContent>
-                {isGeneralLoading ? (
+                {isPageLoading ? ( // Use local state for skeleton
                   <div className="space-y-6">
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-full" />
@@ -160,7 +157,7 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>Application Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="StockPilot" {...field} />
+                            <Input placeholder="StockPilot" {...field} disabled={isGeneralSubmitting} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -172,7 +169,7 @@ export default function SettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Date Format</FormLabel>
-                           <Select onValueChange={field.onChange} value={field.value}>
+                           <Select onValueChange={field.onChange} value={field.value} disabled={isGeneralSubmitting}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select a date format" />
@@ -194,7 +191,7 @@ export default function SettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Time Zone</FormLabel>
-                           <Select onValueChange={field.onChange} value={field.value}>
+                           <Select onValueChange={field.onChange} value={field.value} disabled={isGeneralSubmitting}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select a time zone" />
@@ -218,7 +215,7 @@ export default function SettingsPage() {
                         <FormItem>
                           <FormLabel>Default Currency</FormLabel>
                           <FormControl>
-                            <Input placeholder="USD" {...field} />
+                            <Input placeholder="USD" {...field} disabled={isGeneralSubmitting} />
                           </FormControl>
                           <FormDescription>Enter the 3-letter currency code (e.g., USD, EUR).</FormDescription>
                           <FormMessage />
@@ -233,7 +230,7 @@ export default function SettingsPage() {
                           <FormLabel>Default Tax Rate (%)</FormLabel>
                           <FormControl>
                             <div className="relative">
-                               <Input type="number" placeholder="e.g., 10" {...field} className="pr-8" />
+                               <Input type="number" placeholder="e.g., 10" {...field} className="pr-8" disabled={isGeneralSubmitting} />
                                <Percent className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             </div>
                           </FormControl>
@@ -242,7 +239,7 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="mt-4" disabled={isGeneralSubmitting || isGeneralLoading}>
+                    <Button type="submit" className="mt-4" disabled={isGeneralSubmitting || isPageLoading}>
                       {isGeneralSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                       {isGeneralSubmitting ? 'Saving...' : 'Save General Settings'}
                     </Button>
@@ -260,7 +257,7 @@ export default function SettingsPage() {
                 <CardDescription>Manage how you receive notifications.</CardDescription>
               </CardHeader>
               <CardContent>
-                {isNotificationLoading ? (
+                {isPageLoading ? ( // Use local state for skeleton
                     <div className="space-y-6">
                         <Skeleton className="h-16 w-full" />
                         <Skeleton className="h-16 w-full" />
@@ -280,7 +277,7 @@ export default function SettingsPage() {
                             <FormDescription>Receive important updates via email.</FormDescription>
                           </div>
                           <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                            <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isNotificationSubmitting} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -295,7 +292,7 @@ export default function SettingsPage() {
                             <FormDescription>Get notified when product stock is low.</FormDescription>
                           </div>
                           <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                            <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isNotificationSubmitting} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -310,12 +307,12 @@ export default function SettingsPage() {
                             <FormDescription>Receive alerts for new purchase orders requiring action.</FormDescription>
                           </div>
                           <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                            <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isNotificationSubmitting}/>
                           </FormControl>
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="mt-4" disabled={isNotificationSubmitting || isNotificationLoading}>
+                    <Button type="submit" className="mt-4" disabled={isNotificationSubmitting || isPageLoading}>
                        {isNotificationSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                        {isNotificationSubmitting ? 'Saving...' : 'Save Notification Settings'}
                     </Button>
@@ -353,3 +350,5 @@ export default function SettingsPage() {
     </Card>
   );
 }
+
+    

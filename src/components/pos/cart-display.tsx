@@ -8,19 +8,20 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2, User as UserIcon, Percent, XCircle, DollarSign } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingCart, CreditCard, Loader2, User as UserIcon, Percent, XCircle, DollarSign, Printer } from 'lucide-react'; // Added Printer
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
-import { findOrCreateCustomer, recordSale } from '@/app/(pos)/actions'; // Corrected import path
+import { findOrCreateCustomer, recordSale } from '@/app/(pos)/actions';
 import { fetchAppSettings } from '@/app/admin/settings/actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
-
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 export function CartDisplay() {
+  const router = useRouter(); // Initialize useRouter
   const {
     items, removeItem, updateItemQuantity, clearCart, totalItems,
     subtotal, grandTotal,
@@ -30,7 +31,7 @@ export function CartDisplay() {
     paymentMethod, setPaymentMethod
   } = useCartStore();
   const { getProductById } = useInventoryStore(); 
-  const { activeSession, isLoading: isLoadingSession } = usePosSessionStore(); // Get active POS session state
+  const { activeSession, isLoading: isLoadingSession } = usePosSessionStore();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [promoCode, setPromoCode] = useState('');
@@ -112,13 +113,17 @@ export function CartDisplay() {
     try {
       const recordedSale = await recordSale(saleDataPayload);
       
-      // Refetch active session to update expected cash if it was a cash sale
-      if (paymentMethod === 'Cash') {
+      if (paymentMethod === 'Cash' && activeSession) {
         usePosSessionStore.getState().fetchActiveSession();
       }
 
-      toast.success("Sale " + recordedSale.saleNumber + " successful!", {
-          description: (customerName ? "Customer: " + customerName + ". " : '') + "Total: $" + recordedSale.grandTotal.toFixed(2) + " for " + totalItems() + " items."
+      toast.success(`Sale ${recordedSale.saleNumber} successful!`, {
+          description: `${customerName ? `Customer: ${customerName}. ` : ''}Total: $${recordedSale.grandTotal.toFixed(2)} for ${totalItems()} items.`,
+          action: {
+            label: 'Print Invoice',
+            onClick: () => router.push(`/sales/invoice/${recordedSale.id}`),
+          },
+          duration: 8000, // Keep toast longer for action
       });
       clearCart();
       setCustomerName('');
@@ -155,7 +160,7 @@ export function CartDisplay() {
                 <Button variant="outline" size="sm" className="text-xs px-2 py-1 h-auto" onClick={() => { clearCart(); setCustomerName(''); setPromoCode(''); }} disabled={isCheckingOut || items.length === 0}>
                     <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Clear
                 </Button>
-                 <Link href="/" legacyBehavior passHref>
+                 <Link href="/dashboard" legacyBehavior passHref>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Exit POS">
                        <XCircle className="h-4 w-4"/>
                     </Button>
@@ -343,3 +348,5 @@ export function CartDisplay() {
     </Card>
   );
 }
+
+    

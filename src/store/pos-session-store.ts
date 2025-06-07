@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import type { PosSession } from '@/lib/types';
 import { toast } from 'sonner';
-import { getActivePosSession, startPosSession as startPosSessionAction } from '@/app/(pos)/actions';
+import { getActivePosSession, startPosSession as startPosSessionAction, endPosSession as endPosSessionAction } from '@/app/(pos)/actions';
 
 interface PosSessionState {
   activeSession: PosSession | null;
@@ -10,8 +10,9 @@ interface PosSessionState {
   error: string | null;
   fetchActiveSession: () => Promise<void>;
   startSession: (startingCash: number) => Promise<PosSession | null>;
-  clearSession: () => void; // For logout or manual reset
-  setSession: (session: PosSession | null) => void; // Direct setter
+  endSession: (countedCash: number) => Promise<void>; // Added
+  clearSession: () => void; 
+  setSession: (session: PosSession | null) => void; 
 }
 
 export const usePosSessionStore = create<PosSessionState>((set, get) => ({
@@ -28,8 +29,6 @@ export const usePosSessionStore = create<PosSessionState>((set, get) => ({
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch active POS session.";
       console.error(errorMessage, err);
       set({ error: errorMessage, isLoading: false, activeSession: null });
-      // Do not toast here as this might be called on every POS page load.
-      // Let components decide if they want to show an error.
     }
   },
 
@@ -49,13 +48,31 @@ export const usePosSessionStore = create<PosSessionState>((set, get) => ({
     }
   },
   
+  endSession: async (countedCash: number) => {
+    const currentSession = get().activeSession;
+    if (!currentSession) {
+      toast.error("No active session to end.");
+      set({ isLoading: false }); // Ensure loading is reset
+      return;
+    }
+    set({ isLoading: true, error: null });
+    try {
+      await endPosSessionAction(currentSession.id, countedCash);
+      set({ activeSession: null, isLoading: false });
+      toast.success("POS session ended successfully.");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to end POS session.";
+      console.error(errorMessage, err);
+      set({ error: errorMessage, isLoading: false });
+      toast.error(errorMessage);
+    }
+  },
+
   setSession: (session: PosSession | null) => {
     set({ activeSession: session, isLoading: false, error: null });
   },
 
   clearSession: () => {
     set({ activeSession: null, isLoading: false, error: null });
-    // Optionally: toast.info("POS session cleared.");
   },
 }));
-

@@ -19,6 +19,7 @@ import {
   FileText,
   ReceiptText, 
   WalletCards, 
+  ClipboardList, // Added for Shift History
 } from 'lucide-react';
 
 export interface NavSubItem {
@@ -97,6 +98,7 @@ export const sidebarNavGroups: NavGroup[] = [
         isInitiallyOpen: false,
         subItems: [
           { href: '/reports/income-statement', label: 'Income Statement', icon: FileText },
+          { href: '/reports/shift-history', label: 'Shift History', icon: ClipboardList },
         ],
         isActive: (pathname) => pathname.startsWith('/reports'),
       },

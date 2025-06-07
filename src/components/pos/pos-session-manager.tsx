@@ -24,7 +24,12 @@ export function PosSessionManager() {
   const { activeSession, isLoading, error, fetchActiveSession, startSession } = usePosSessionStore();
   const [isStartShiftDialogOpen, setIsStartShiftDialogOpen] = useState(false);
   const [startingCash, setStartingCash] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingStart, setIsSubmittingStart] = useState(false);
+
+  const [isEndShiftDialogOpen, setIsEndShiftDialogOpen] = useState(false);
+  const [countedCashInput, setCountedCashInput] = useState('');
+  const [isEndingSession, setIsEndingSession] = useState(false);
+
 
   useEffect(() => {
     fetchActiveSession();
@@ -36,21 +41,28 @@ export function PosSessionManager() {
       toast.error("Please enter a valid non-negative amount for starting cash.");
       return;
     }
-    setIsSubmitting(true);
+    setIsSubmittingStart(true);
     const newSession = await startSession(cashAmount);
     if (newSession) {
       setIsStartShiftDialogOpen(false);
       setStartingCash('');
     }
-    setIsSubmitting(false);
+    setIsSubmittingStart(false);
   };
   
-  // Placeholder for end shift functionality
-  const handleEndShift = () => {
-    toast.info("End shift functionality not yet implemented.");
-    // Future: Open a dialog to count cash, then call an action to close the session.
-    // Example: usePosSessionStore.getState().endSession(activeSession.id, countedCash);
-  }
+  const handleEndShiftConfirm = async () => {
+    const cash = parseFloat(countedCashInput);
+    if (isNaN(cash) || cash < 0) {
+      toast.error("Please enter a valid counted cash amount.");
+      return;
+    }
+    setIsEndingSession(true);
+    await usePosSessionStore.getState().endSession(cash);
+    setIsEndingSession(false);
+    setIsEndShiftDialogOpen(false); 
+    setCountedCashInput(''); 
+  };
+
 
   if (isLoading && !activeSession) {
     return (
@@ -102,19 +114,19 @@ export function PosSessionManager() {
                     onChange={(e) => setStartingCash(e.target.value)}
                     placeholder="0.00"
                     className="pl-8"
-                    disabled={isSubmitting}
+                    disabled={isSubmittingStart}
                   />
                 </div>
               </div>
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline" disabled={isSubmitting}>
+                <Button type="button" variant="outline" disabled={isSubmittingStart}>
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="button" onClick={handleStartSession} disabled={isSubmitting || !startingCash.trim()}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="button" onClick={handleStartSession} disabled={isSubmittingStart || !startingCash.trim()}>
+                {isSubmittingStart && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Start Shift
               </Button>
             </DialogFooter>
@@ -124,7 +136,9 @@ export function PosSessionManager() {
     );
   }
 
+  // Active session display
   return (
+    <>
     <Card className="mb-4 shadow-md">
         <CardHeader className="p-3 flex flex-row items-center justify-between bg-primary/5 rounded-t-lg">
             <div>
@@ -133,7 +147,7 @@ export function PosSessionManager() {
                     Shift started at: {format(new Date(activeSession.startTime), 'MMM dd, yyyy HH:mm')}
                 </p>
             </div>
-            <Button onClick={handleEndShift} size="sm" variant="outline" className="text-xs border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive">
+            <Button onClick={() => setIsEndShiftDialogOpen(true)} size="sm" variant="outline" className="text-xs border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive">
                 <PowerOff className="mr-2 h-3.5 w-3.5" /> End Shift
             </Button>
         </CardHeader>
@@ -168,5 +182,59 @@ export function PosSessionManager() {
         </div>
       </CardContent>
     </Card>
+
+    {/* End Shift Dialog */}
+    <Dialog open={isEndShiftDialogOpen} onOpenChange={setIsEndShiftDialogOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>End Current Shift</DialogTitle>
+          <DialogDescription>
+            Count the cash in your drawer and enter the total amount.
+            Expected cash in drawer is currently: <strong>${activeSession.expectedCashInDrawer.toFixed(2)}</strong>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="countedCashInput">Counted Cash Total</Label>
+            <div className="relative">
+              <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="countedCashInput"
+                type="number"
+                value={countedCashInput}
+                onChange={(e) => setCountedCashInput(e.target.value)}
+                placeholder="0.00"
+                className="pl-8"
+                disabled={isEndingSession}
+              />
+            </div>
+          </div>
+          {countedCashInput && !isNaN(parseFloat(countedCashInput)) && activeSession.expectedCashInDrawer !== null && (
+            <div className="text-sm mt-2 p-3 bg-muted/50 rounded-md">
+              <p>Expected: ${activeSession.expectedCashInDrawer.toFixed(2)}</p>
+              <p>Counted: ${parseFloat(countedCashInput).toFixed(2)}</p>
+              <p className={`font-semibold ${parseFloat(countedCashInput) - activeSession.expectedCashInDrawer === 0 ? 'text-gray-600' : (parseFloat(countedCashInput) - activeSession.expectedCashInDrawer > 0 ? 'text-green-600' : 'text-red-600')}`}>
+                Difference: ${(parseFloat(countedCashInput) - activeSession.expectedCashInDrawer).toFixed(2)}
+                {parseFloat(countedCashInput) - activeSession.expectedCashInDrawer > 0 ? ' (Over)' : parseFloat(countedCashInput) - activeSession.expectedCashInDrawer < 0 ? ' (Short)' : ' (Balanced)'}
+              </p>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline" disabled={isEndingSession}>Cancel</Button>
+          </DialogClose>
+          <Button
+            type="button"
+            onClick={handleEndShiftConfirm}
+            disabled={isEndingSession || !countedCashInput.trim()}
+          >
+            {isEndingSession && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Confirm & End Shift
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

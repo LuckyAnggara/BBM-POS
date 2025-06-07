@@ -188,6 +188,7 @@ export interface PosSession extends Omit<PrismaPosSession, 'startTime' | 'endTim
   startingCash: number;
   countedCash?: number | null;
   expectedCashInDrawer: number;
+  cashDifference?: number | null; // Added for calculated difference
   totalSalesAmount: number;
   totalRefundsAmount: number;
   user?: User;

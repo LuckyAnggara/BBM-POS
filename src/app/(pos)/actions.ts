@@ -7,6 +7,8 @@ import { StockMovementTypeEnum, CashTransactionTypeEnum, PosSessionStatusEnum } 
 import { revalidatePath } from 'next/cache';
 import { getUserSession, type UserSessionData } from '@/lib/user-session'; 
 import { Decimal } from '@prisma/client/runtime/library';
+import type { PosSession as PrismaPosSession } from '@prisma/client';
+
 
 const mapPrismaUserToAppUser = (prismaUser: any): User | undefined => {
   if (!prismaUser) return undefined;
@@ -68,15 +70,25 @@ const mapPrismaCashTransactionToApp = (dbCashTransaction: any): CashTransaction 
 };
 
 const mapPrismaPosSessionToApp = (dbPosSession: any): PosSession => {
+  const expectedCash = dbPosSession.expectedCashInDrawer.toNumber();
+  const countedCashVal = dbPosSession.countedCash?.toNumber() ?? null;
+  // Calculate cashDifference only if countedCash is available
+  const cashDifferenceVal = countedCashVal !== null && dbPosSession.status === PosSessionStatusEnum.CLOSED
+    ? countedCashVal - expectedCash 
+    : null;
+
   return {
-    ...dbPosSession,
+    id: dbPosSession.id,
+    userId: dbPosSession.userId,
     startTime: dbPosSession.startTime.toISOString(),
     endTime: dbPosSession.endTime?.toISOString() || null,
     startingCash: dbPosSession.startingCash.toNumber(),
-    countedCash: dbPosSession.countedCash?.toNumber() || null,
-    expectedCashInDrawer: dbPosSession.expectedCashInDrawer.toNumber(),
+    countedCash: countedCashVal,
+    expectedCashInDrawer: expectedCash,
+    cashDifference: cashDifferenceVal,
     totalSalesAmount: dbPosSession.totalSalesAmount.toNumber(),
     totalRefundsAmount: dbPosSession.totalRefundsAmount.toNumber(),
+    status: dbPosSession.status as PosSessionStatusEnum,
     createdAt: dbPosSession.createdAt.toISOString(),
     updatedAt: dbPosSession.updatedAt.toISOString(),
     user: dbPosSession.user ? mapPrismaUserToAppUser(dbPosSession.user) : undefined,
@@ -342,6 +354,7 @@ export async function recordSale(
     revalidatePath('/(app)/admin/products');
     if (activePosSession) {
         revalidatePath('/(pos)/pos'); 
+        revalidatePath('/reports/shift-history');
     }
 
     return mapPrismaSaleToAppSale(createdSale);
@@ -388,14 +401,15 @@ export async function startPosSession(startingCash: number): Promise<PosSession>
         userId: userIdForDbOperations,
         startTime: new Date(),
         startingCash: startingCash,
-        expectedCashInDrawer: startingCash,
+        expectedCashInDrawer: startingCash, // Initial expected is starting cash
         status: PosSessionStatusEnum.OPEN,
-        totalSalesAmount: 0,
+        totalSalesAmount: 0, // Initialize aggregates
         totalRefundsAmount: 0,
       },
       include: { user: true, cashTransactions: true } 
     });
 
+    // Log starting cash as a transaction
     await tx.cashTransaction.create({
       data: {
         posSessionId: newPosSession.id,
@@ -407,6 +421,7 @@ export async function startPosSession(startingCash: number): Promise<PosSession>
     });
 
     revalidatePath('/(pos)/pos');
+    revalidatePath('/reports/shift-history');
     return mapPrismaPosSessionToApp(newPosSession);
   });
 }
@@ -432,4 +447,57 @@ export async function getActivePosSession(): Promise<PosSession | null> {
     return null;
   }
   return mapPrismaPosSessionToApp(activeDbSession);
+}
+
+export async function endPosSession(sessionId: string, countedCashFloat: number): Promise<PosSession> {
+  const session = await getUserSession();
+  if (!session?.userId) {
+    throw new Error("User not authenticated. Please log in to end a POS session.");
+  }
+  const userIdForDbOperations = session.userId;
+  const countedCashDecimal = new Decimal(countedCashFloat);
+
+  return await prisma.$transaction(async (tx) => {
+    const activeDbSession = await tx.posSession.findUnique({
+      where: { id: sessionId, userId: userIdForDbOperations, status: PosSessionStatusEnum.OPEN },
+    });
+
+    if (!activeDbSession) {
+      throw new Error("Active POS session not found for this user or it's already closed.");
+    }
+
+    // Update the session: set end time, status to CLOSED, and record counted cash
+    const updatedDbSession = await tx.posSession.update({
+      where: { id: sessionId },
+      data: {
+        endTime: new Date(),
+        status: PosSessionStatusEnum.CLOSED,
+        countedCash: countedCashDecimal,
+      },
+      include: { user: true, cashTransactions: { orderBy: { createdAt: 'asc' } } } // Re-include for mapping
+    });
+
+    // Create a cash transaction for the final cash counted (interpreted as amount removed or reconciled)
+    // The description can hold more context.
+    await tx.cashTransaction.create({
+      data: {
+        posSessionId: sessionId,
+        userId: userIdForDbOperations,
+        type: CashTransactionTypeEnum.PAY_OUT, // Using PAY_OUT to signify cash reconciled/removed
+        amount: countedCashDecimal, 
+        description: `End of shift cash count. Expected: ${activeDbSession.expectedCashInDrawer.toFixed(2)}, Counted: ${countedCashDecimal.toFixed(2)}.`,
+      }
+    });
+    
+    // Important: expectedCashInDrawer on the PosSession is what was expected BEFORE this final count.
+    // The difference is calculated dynamically for reports.
+    // If the system needs to track a running balance that gets zeroed out, 
+    // then expectedCashInDrawer would be decremented here by countedCashDecimal.
+    // For reporting, current approach is fine.
+
+    revalidatePath('/(pos)/pos');
+    revalidatePath('/reports/shift-history');
+    
+    return mapPrismaPosSessionToApp(updatedDbSession); // mapPrismaPosSessionToApp will calculate cashDifference
+  });
 }

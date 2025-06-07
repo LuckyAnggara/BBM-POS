@@ -8,12 +8,11 @@ import { LogIn } from 'lucide-react';
 export default function RootPage() {
   // This page serves as the landing page for the root path '/'.
   // It should not use hooks like usePageTitle that depend on AppShell's context.
-  // The actual dashboard is served by src/app/(app)/page.tsx for authenticated users.
+  // The actual dashboard is served by src/app/(app)/dashboard/page.tsx for authenticated users.
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted/40 p-6 text-center">
       <div className="mb-8">
         {/* You can place a logo here if desired */}
-        {/* Example: <img src="/logo.svg" alt="StockPilot Logo" className="h-16 w-auto mx-auto" /> */}
         <svg
           className="mx-auto h-16 w-auto text-primary mb-4"
           viewBox="0 0 24 24"

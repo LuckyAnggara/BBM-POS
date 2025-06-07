@@ -1,6 +1,7 @@
 
 import NextAuth, { type NextAuthConfig } from 'next-auth';
-import CredentialsProvider from 'next-auth/providers/credentials';
+import CredentialsProvider  from 'next-auth/providers/credentials';
+import  Credentials  from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
@@ -102,7 +103,7 @@ export const authConfig: NextAuthConfig = {
       // console.log("JWT Callback - Input Session for update (if trigger is 'update'):", JSON.stringify(updateSessionData, null, 2));
 
       if (user) { // This block runs on initial sign-in (credentials or OAuth)
-        token.id = user.id; 
+        // token.id = user.id; 
         token.role = user.role; 
         token.isActive = user.isActive; 
         // Default fields like name, email, picture are usually handled by NextAuth if present on user
@@ -167,7 +168,7 @@ export const authConfig: NextAuthConfig = {
   },
   pages: {
     signIn: '/login',
-    error: '/auth/error', 
+    error: '/login', 
   },
   secret: process.env.AUTH_SECRET, 
 };

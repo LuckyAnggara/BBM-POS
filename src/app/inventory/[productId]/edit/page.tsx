@@ -26,6 +26,7 @@ import { Save, ArrowLeft, Loader2, EditIcon, DollarSign, ListTree, Hash, Layers,
 import { useParams, useRouter } from 'next/navigation';
 import { fetchAllCategoriesAction } from '@/app/inventory/actions';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 const productSchema = z.object({
   name: z.string().min(1, "Product name is required").max(100, "Product name too long"),
@@ -44,6 +45,7 @@ const productSchema = z.object({
 type ProductFormValues = z.infer<typeof productSchema>;
 
 export default function EditProductPage() {
+  usePageTitle('Edit Product');
   const router = useRouter();
   const params = useParams();
   const productId = params.productId as string;
@@ -151,13 +153,14 @@ export default function EditProductPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 print:hidden">
         <Button variant="outline" size="icon" onClick={() => router.back()} disabled={isSubmitting}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
+        {/* Main title and description are now in AppShell Header */}
         <div>
-          <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><EditIcon className="h-7 w-7 text-primary"/>Edit Product</h1>
-          <p className="text-muted-foreground">Modify the details for: {product?.name || 'Loading...'}</p>
+          <h2 className="text-xl font-semibold">Product: {product?.name || 'Loading...'}</h2>
+          <p className="text-sm text-muted-foreground">Modify the details for this product.</p>
         </div>
       </div>
 

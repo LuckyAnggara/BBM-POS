@@ -30,6 +30,7 @@ import {
 import { fetchAppSettings, saveAppSettings } from './actions';
 import type { AppSettings } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 
 const generalSettingsSchema = z.object({
@@ -52,6 +53,7 @@ type NotificationSettingsValues = z.infer<typeof notificationSettingsSchema>;
 
 
 export default function SettingsPage() {
+  usePageTitle('System Settings');
   const generalForm = useForm<GeneralSettingsValues>({
     resolver: zodResolver(generalSettingsSchema),
     // Default values will be loaded from DB
@@ -122,11 +124,8 @@ export default function SettingsPage() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="font-headline">System Settings</CardTitle>
-        <CardDescription>Configure application-wide settings and preferences.</CardDescription>
-      </CardHeader>
-      <CardContent>
+      {/* CardHeader removed as title is now in AppShell */}
+      <CardContent className="pt-6"> {/* Added pt-6 for spacing */}
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
             <TabsTrigger value="general"><Building className="mr-2 h-4 w-4 inline-block" />General</TabsTrigger>

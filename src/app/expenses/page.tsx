@@ -36,8 +36,10 @@ import type { Expense, ExpenseCategory } from '@/lib/types';
 import { fetchExpenses, fetchAllExpenseCategoriesAction, deleteExpense, type FetchExpensesFilters } from './actions';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 export default function ExpensesPage() {
+  usePageTitle('Expenses');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -125,13 +127,8 @@ export default function ExpensesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-headline font-semibold flex items-center gap-2">
-            <ReceiptText className="h-8 w-8 text-primary" /> Expenses
-          </h1>
-          <p className="text-muted-foreground">Track and manage all your business expenses.</p>
-        </div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
+        {/* Title and description removed, handled by AppShell */}
         <Link href="/expenses/add" passHref>
           <Button>
             <PlusCircle className="mr-2 h-4 w-4" /> Log New Expense
@@ -255,5 +252,4 @@ export default function ExpensesPage() {
     </div>
   );
 }
-
     

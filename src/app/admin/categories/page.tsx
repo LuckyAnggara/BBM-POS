@@ -15,6 +15,7 @@ import { fetchCategories, createCategory } from './actions';
 import type { Category } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 const categorySchema = z.object({
   name: z.string().min(1, "Category name is required").max(50, "Category name too long"),
@@ -23,6 +24,7 @@ const categorySchema = z.object({
 type CategoryFormValues = z.infer<typeof categorySchema>;
 
 export default function CategoryManagementPage() {
+  usePageTitle('Product Category Management');
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);

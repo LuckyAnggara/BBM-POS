@@ -36,6 +36,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { createPurchaseOrder } from '../actions';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 const purchaseOrderItemSchema = z.object({
   productId: z.string().min(1, "Product selection is required"),
@@ -63,6 +64,7 @@ const purchaseOrderSchema = z.object({
 export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 
 export default function CreatePurchaseOrderPage() {
+  usePageTitle('Create New Purchase Order');
   const router = useRouter();
   const { products: inventoryProducts, fetchProducts, isLoading: inventoryLoading } = useInventoryStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -135,14 +137,11 @@ export default function CreatePurchaseOrderPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 print:hidden">
         <Button variant="outline" size="icon" onClick={() => router.back()} disabled={isSubmitting}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-3xl font-headline font-semibold">Create New Purchase Order</h1>
-          <p className="text-muted-foreground">Fill in the details to create a new PO.</p>
-        </div>
+        {/* Title and description elements removed */}
       </div>
 
       <Form {...form}>

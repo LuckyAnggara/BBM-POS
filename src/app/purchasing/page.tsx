@@ -22,8 +22,10 @@ import { useInventoryStore } from '@/store/inventory-store';
 import Link from 'next/link';
 import { purchaseOrderStatusColors } from '@/lib/mock-data'; // Keep this for UI colors
 import { fetchPurchaseOrders, deletePurchaseOrderById, updatePurchaseOrderStatus } from './actions';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 export default function PurchasingPage() {
+  usePageTitle('Purchase Orders');
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -102,11 +104,8 @@ export default function PurchasingPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-headline font-semibold">Purchase Orders</h1>
-          <p className="text-muted-foreground">Create, manage, and track your purchase orders.</p>
-        </div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
+        {/* Title and description elements removed */}
         <Link href="/purchasing/create" passHref>
           <Button>
             <PlusCircle className="mr-2 h-4 w-4" /> Create New PO

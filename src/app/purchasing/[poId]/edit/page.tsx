@@ -38,6 +38,7 @@ import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchPurchaseOrderById, updatePurchaseOrder } from '../actions'; // Import server actions
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 const purchaseOrderItemSchema = z.object({
   id: z.string().optional(), // For existing items
@@ -68,6 +69,7 @@ const purchaseOrderSchema = z.object({
 export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 
 export default function EditPurchaseOrderPage() {
+  usePageTitle('Edit Purchase Order');
   const router = useRouter();
   const params = useParams();
   const poId = params.poId as string;
@@ -198,9 +200,9 @@ export default function EditPurchaseOrderPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 print:hidden">
         <Button variant="outline" size="icon" onClick={() => router.back()} disabled={isSubmitting}> <ArrowLeft className="h-4 w-4" /> </Button>
-        <div> <h1 className="text-3xl font-headline font-semibold">Edit Purchase Order: {existingPO.poNumber}</h1> <p className="text-muted-foreground">Modify the details of this PO.</p> </div>
+        <div> <h2 className="text-xl font-semibold">PO: {existingPO.poNumber}</h2> <p className="text-sm text-muted-foreground">Modify the details of this PO.</p> </div>
       </div>
 
       <Form {...form}>

@@ -13,6 +13,7 @@ import { ArrowLeft, Printer, Building, UserCircle, Hash, CalendarDays, CreditCar
 import type { Sale, SaleStatus } from '@/lib/types';
 import { fetchSaleById } from '../../actions';
 import { Badge } from '@/components/ui/badge';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 // Placeholder company details
 const companyDetails = {
@@ -32,6 +33,7 @@ const saleStatusColors: Record<SaleStatus, string> = {
 
 
 export default function InvoicePage() {
+  usePageTitle('Invoice Details');
   const router = useRouter();
   const params = useParams();
   const saleId = params.saleId as string;

@@ -22,9 +22,11 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { usePageTitle } from '@/components/layout/page-title-context';
 // import { format } from 'date-fns'; // Not used yet
 
 export default function AdminProductManagementPage() {
+  usePageTitle('Product Catalog Management');
   const { products, fetchProducts, isLoading, deleteProduct, updateProduct } = useInventoryStore();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -67,7 +69,7 @@ export default function AdminProductManagementPage() {
     <Card>
       <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <CardTitle className="font-headline">Product Catalog Management</CardTitle>
+          <CardTitle className="font-headline">Product Catalog Details</CardTitle>
           <CardDescription>Oversee and manage all products in the system. Set pricing, stock, and supplier details.</CardDescription>
         </div>
         <Link href="/inventory/add" passHref>

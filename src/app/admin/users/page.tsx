@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchUsers, deleteUserById, updateUserActiveStatus } from './actions';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 const roleColors: Record<UserRole, string> = {
   ADMIN: 'bg-destructive text-destructive-foreground',
@@ -30,6 +31,7 @@ const roleColors: Record<UserRole, string> = {
 
 
 export default function UserManagementPage() {
+  usePageTitle('User Management');
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,7 +91,7 @@ export default function UserManagementPage() {
     <Card>
       <CardHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <CardTitle className="font-headline">User Management</CardTitle>
+          <CardTitle className="font-headline">User Details</CardTitle>
           <CardDescription>Manage users, their roles, and access permissions.</CardDescription>
         </div>
         <Button disabled> {/* TODO: Implement Add User Page */}

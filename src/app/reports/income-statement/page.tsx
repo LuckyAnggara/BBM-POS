@@ -13,6 +13,7 @@ import type { IncomeStatementData } from '@/lib/types';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 interface StatDisplayProps {
   title: string;
@@ -53,6 +54,7 @@ function StatDisplay({ title, value, icon: Icon, isLoading, currency = true, tre
 
 
 export default function IncomeStatementPage() {
+  usePageTitle('Income Statement');
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({
     from: subDays(new Date(), 30), // Default to last 30 days
     to: new Date(),
@@ -87,10 +89,8 @@ export default function IncomeStatementPage() {
     <div className="flex flex-col gap-6">
       <Card className="print:shadow-none print:border-none">
         <CardHeader>
-          <CardTitle className="font-headline flex items-center gap-2">
-            <FileText className="h-6 w-6 text-primary" />
-            Income Statement
-          </CardTitle>
+          {/* Title and Description moved to AppShell/Context for main page title */}
+          <CardTitle className="font-headline text-xl">Generate Statement</CardTitle>
           <CardDescription>
             Select a date range to generate the income statement.
             This report reflects completed sales and recorded expenses.
@@ -206,5 +206,4 @@ export default function IncomeStatementPage() {
     </div>
   );
 }
-
     

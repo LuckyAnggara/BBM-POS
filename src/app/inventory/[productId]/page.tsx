@@ -13,8 +13,10 @@ import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner'; // For toast notifications
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 export default function ProductDetailPage() {
+  usePageTitle('Product Details');
   const router = useRouter();
   const params = useParams();
   const productId = params.productId as string;
@@ -110,15 +112,16 @@ export default function ProductDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" onClick={() => router.back()}> <ArrowLeft className="h-4 w-4" /> </Button>
+          {/* Main title and description elements removed */}
           <div>
-            <h1 className="text-3xl font-headline font-semibold flex items-center gap-2">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
               {product.name}
               {isArchived && <Badge variant="outline" className="text-sm border-orange-500 text-orange-600 bg-orange-500/10">Archived</Badge>}
-            </h1>
-            <p className="text-muted-foreground">SKU: {product.sku}</p>
+            </h2>
+            <p className="text-sm text-muted-foreground">SKU: {product.sku}</p>
           </div>
         </div>
         <div className="flex gap-2 flex-shrink-0">

@@ -27,6 +27,7 @@ import { createExpense, fetchAllExpenseCategoriesAction } from '../actions';
 import type { ExpenseCategory } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 const expenseSchema = z.object({
   date: z.date({ required_error: "Expense date is required." }),
@@ -39,6 +40,7 @@ const expenseSchema = z.object({
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
 export default function AddExpensePage() {
+  usePageTitle('Log New Expense');
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
@@ -86,16 +88,11 @@ export default function AddExpensePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" onClick={() => router.push('/expenses')} disabled={isSubmitting}>
+      <div className="flex items-center gap-4 print:hidden"> {/* Hiding this div for print */}
+        <Button variant="outline" size="icon" onClick={() => router.back()} disabled={isSubmitting}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-3xl font-headline font-semibold flex items-center gap-2">
-            <ReceiptText className="h-8 w-8 text-primary"/>Log New Expense
-          </h1>
-          <p className="text-muted-foreground">Fill in the details for the new expense.</p>
-        </div>
+        {/* Title and description elements removed, handled by AppShell */}
       </div>
 
       <Form {...form}>
@@ -179,7 +176,7 @@ export default function AddExpensePage() {
               )} />
             </CardContent>
             <CardFooter className="border-t pt-6 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => router.push('/expenses')} disabled={isSubmitting}>
+                <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting || isLoadingCategories}>
@@ -193,5 +190,4 @@ export default function AddExpensePage() {
     </div>
   );
 }
-
     

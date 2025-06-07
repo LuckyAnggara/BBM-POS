@@ -24,8 +24,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { fetchAllCategoriesAction } from '@/app/inventory/actions'; // For category filter
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 export default function InventoryPage() {
+  usePageTitle('Inventory Overview');
   const { products, fetchProducts, isLoading, deleteProduct, updateProduct } = useInventoryStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -96,11 +98,8 @@ export default function InventoryPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><Package className="h-8 w-8 text-primary"/>Inventory Overview</h1>
-          <p className="text-muted-foreground">Manage all your products, stock levels, and details.</p>
-        </div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
+        {/* Title and description elements removed */}
         <Link href="/inventory/add" passHref>
             <Button>
             <PackagePlus className="mr-2 h-4 w-4" /> Add New Product

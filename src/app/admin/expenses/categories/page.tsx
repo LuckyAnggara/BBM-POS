@@ -15,6 +15,7 @@ import { fetchExpenseCategories, createExpenseCategory, deleteExpenseCategory } 
 import type { ExpenseCategory } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 const expenseCategorySchema = z.object({
   name: z.string().min(1, "Category name is required").max(50, "Category name too long"),
@@ -23,6 +24,7 @@ const expenseCategorySchema = z.object({
 type ExpenseCategoryFormValues = z.infer<typeof expenseCategorySchema>;
 
 export default function ExpenseCategoryManagementPage() {
+  usePageTitle('Expense Category Management');
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -160,5 +162,4 @@ export default function ExpenseCategoryManagementPage() {
     </div>
   );
 }
-
     

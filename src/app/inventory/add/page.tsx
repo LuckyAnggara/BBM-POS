@@ -25,6 +25,7 @@ import { Save, ArrowLeft, Loader2, PackagePlus, DollarSign, ListTree, Hash, Laye
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { fetchAllCategoriesAction } from '@/app/inventory/actions';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 const productSchema = z.object({
   name: z.string().min(1, "Product name is required").max(100, "Product name too long"),
@@ -43,6 +44,7 @@ const productSchema = z.object({
 type ProductFormValues = z.infer<typeof productSchema>;
 
 export default function AddProductPage() {
+  usePageTitle('Add New Product');
   const router = useRouter();
   const { addProduct } = useInventoryStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,14 +104,11 @@ export default function AddProductPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 print:hidden">
         <Button variant="outline" size="icon" onClick={() => router.back()} disabled={isSubmitting}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-3xl font-headline font-semibold flex items-center gap-2"><PackagePlus className="h-8 w-8 text-primary"/>Add New Product</h1>
-          <p className="text-muted-foreground">Fill in the details for the new product.</p>
-        </div>
+        {/* Title and description elements removed, handled by AppShell */}
       </div>
 
       <Form {...form}>

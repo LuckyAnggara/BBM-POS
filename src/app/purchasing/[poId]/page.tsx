@@ -16,8 +16,12 @@ import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchPurchaseOrderById } from '../actions'; // Import server action
+import { usePageTitle } from '@/components/layout/page-title-context';
+import { toast } from 'sonner';
+
 
 export default function PurchaseOrderDetailPage() {
+  usePageTitle('Purchase Order Details');
   const router = useRouter();
   const params = useParams();
   const poId = params.poId as string;
@@ -74,10 +78,14 @@ export default function PurchaseOrderDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between print:hidden">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" onClick={() => router.push('/purchasing')}> <ArrowLeft className="h-4 w-4" /> <span className="sr-only">Back to Purchase Orders</span> </Button>
-          <div> <h1 className="text-3xl font-headline font-semibold">PO: {purchaseOrder.poNumber}</h1> <p className="text-muted-foreground">Details for Purchase Order</p> </div>
+          {/* Title and description elements removed */}
+          <div>
+             <h2 className="text-xl font-semibold">PO: {purchaseOrder.poNumber}</h2>
+             <p className="text-sm text-muted-foreground">Details for Purchase Order</p>
+          </div>
         </div>
         <Link href={`/purchasing/${purchaseOrder.id}/edit`} passHref> <Button> <Edit className="mr-2 h-4 w-4" /> Edit PO </Button> </Link>
       </div>

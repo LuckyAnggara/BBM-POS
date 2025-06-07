@@ -15,6 +15,7 @@ import type { StockMovement, Product as ProductType, StockMovementType } from '@
 import { fetchStockMovementsByProductId } from '@/app/inventory/actions';
 import { useInventoryStore } from '@/store/inventory-store';
 import { Badge } from '@/components/ui/badge';
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 const movementTypeLabels: Record<StockMovementType, string> = {
   INITIAL_STOCK: 'Initial Stock',
@@ -42,6 +43,7 @@ const movementTypeColors: Record<StockMovementType, string> = {
 
 
 export default function ProductStockHistoryPage() {
+  usePageTitle('Stock Movement History');
   const router = useRouter();
   const params = useParams();
   const productId = params.productId as string;
@@ -109,13 +111,14 @@ export default function ProductStockHistoryPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 print:hidden">
         <Button variant="outline" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
+        {/* Main title and description now in AppShell Header */}
         <div>
-          <h1 className="text-3xl font-headline font-semibold">Stock Movement History</h1>
-          <p className="text-muted-foreground">For Product: <Link href={`/inventory/${product.id}`} className="text-primary hover:underline font-medium">{product.name}</Link> (SKU: {product.sku})</p>
+          <h2 className="text-xl font-semibold">Product: {product.name} (SKU: {product.sku})</h2>
+          <p className="text-sm text-muted-foreground">Detailed stock movement log.</p>
         </div>
       </div>
 

@@ -47,6 +47,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 const paymentMethodOptions = ['All Methods', 'Cash', 'Credit Card', 'VISA', 'Mastercard']; // Add more as needed
 const saleStatusOptions: Array<SaleStatus | 'All Statuses'> = ['All Statuses', 'Completed', 'PendingPayment', 'Refunded', 'Cancelled'];
@@ -67,6 +68,7 @@ const saleStatusColors: Record<SaleStatus, string> = {
 
 
 export default function SalesHistoryPage() {
+  usePageTitle('Sales History');
   const [sales, setSales] = useState<Sale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingRefund, setIsProcessingRefund] = useState<string | null>(null); // Store saleId being refunded
@@ -157,13 +159,8 @@ export default function SalesHistoryPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-headline font-semibold flex items-center gap-2">
-            <History className="h-7 w-7 text-primary" /> Sales History
-          </h1>
-          <p className="text-muted-foreground">View and manage all past sales transactions.</p>
-        </div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
+        {/* Title and description elements removed */}
         <Button variant="outline" disabled>
           <Download className="mr-2 h-4 w-4" /> Export History
         </Button>

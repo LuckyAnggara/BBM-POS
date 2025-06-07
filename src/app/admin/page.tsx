@@ -1,10 +1,13 @@
 
+'use client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { BarChart, Users, Package, Settings, Activity, ListTree, WalletCards } from "lucide-react"; // Added WalletCards
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { usePageTitle } from '@/components/layout/page-title-context';
 
 export default function AdminOverviewPage() {
+  usePageTitle('Admin Overview');
   return (
     <div className="flex flex-col gap-6">
       <Card>
@@ -95,5 +98,4 @@ export default function AdminOverviewPage() {
     </div>
   );
 }
-
     

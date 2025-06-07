@@ -1,31 +1,21 @@
 
 import { PrismaClient, Category, Product, User, Sale, PurchaseOrder } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-// import bcrypt from 'bcryptjs'; // bcrypt removed
 
 const prisma = new PrismaClient();
 
-// const saltRounds = 10; // bcrypt salt rounds removed
-
 async function seedUsers() {
-  // const adminPasswordPlain = "password123"; // Removed
-  // const staffPasswordPlain = "staffpass"; // Removed
-
-  // const adminPasswordHash = bcrypt.hashSync(adminPasswordPlain, saltRounds); // Removed
-  // const staffPasswordHash = bcrypt.hashSync(staffPasswordPlain, saltRounds); // Removed
-
+  console.log('Seeding users...');
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
     update: {
       name: 'Admin User Alice',
       role: 'ADMIN',
-      // password field removed
     },
     create: {
       id: 'user_admin_alice',
       name: 'Admin User Alice',
       email: 'admin@example.com',
-      // password: adminPasswordHash, // password field removed
       role: 'ADMIN',
       isActive: true,
       image: 'https://placehold.co/80x80/7F56D9/FFFFFF.png?text=AA'
@@ -37,23 +27,22 @@ async function seedUsers() {
     update: {
       name: 'Staff User Charlie',
       role: 'STAFF',
-      // password field removed
     },
     create: {
       id: 'user_staff_charlie',
       name: 'Staff User Charlie',
       email: 'staff@example.com',
-      // password: staffPasswordHash, // password field removed
       role: 'STAFF',
       isActive: true,
       image: 'https://placehold.co/80x80/64748B/FFFFFF.png?text=SC'
     },
   });
-
+  console.log('Users seeded:', { admin, staff });
   return { admin, staff };
 }
 
 async function seedCategories() {
+  console.log('Seeding categories...');
   const electronics = await prisma.category.upsert({
     where: { name: 'Electronics' },
     update: {},
@@ -64,10 +53,12 @@ async function seedCategories() {
     update: {},
     create: { name: 'Groceries' },
   });
+  console.log('Categories seeded.');
   return { electronics, groceries };
 }
 
 async function seedProducts(categories: Record<string, Category>) {
+  console.log('Seeding products...');
   const product1 = await prisma.product.upsert({
     where: { sku: 'MOUSE001' },
     update: {
@@ -115,11 +106,12 @@ async function seedProducts(categories: Record<string, Category>) {
       lowStockThreshold: 10,
     },
   });
-
+  console.log('Products seeded.');
   return { product1, product2 };
 }
 
 async function seedPurchaseOrders(users: Record<string, User>, products: Record<string, Product>) {
+  console.log('Seeding purchase orders...');
   const existingPo = await prisma.purchaseOrder.findUnique({ where: { poNumber: 'PO1001' }});
   if (existingPo) {
     console.log('PO1001 already exists, skipping PO seed or use it.');
@@ -133,7 +125,7 @@ async function seedPurchaseOrders(users: Record<string, User>, products: Record<
       orderDate: new Date(),
       status: 'Ordered',
       totalAmount: new Decimal(300),
-      createdById: users.admin.id, // Assuming User model and admin user still exist
+      createdById: users.admin.id,
       items: {
         create: [{
           productId: products.product1.id,
@@ -145,11 +137,12 @@ async function seedPurchaseOrders(users: Record<string, User>, products: Record<
       },
     },
   });
-
+  console.log('Purchase orders seeded.');
   return { po };
 }
 
 async function seedSales(users: Record<string, User>, products: Record<string, Product>) {
+  console.log('Seeding sales...');
   const customer = await prisma.customer.upsert({
     where: { email: 'johndoe@example.com' },
     update: {},
@@ -168,7 +161,7 @@ async function seedSales(users: Record<string, User>, products: Record<string, P
       saleDate: new Date(),
       customerId: customer.id,
       customerName: customer.name,
-      userId: users.staff.id, // Assuming User model and staff user still exist
+      userId: users.staff.id,
       subtotal: new Decimal(31.98),
       discountAmount: new Decimal(0),
       taxPercent: new Decimal(10),
@@ -189,7 +182,7 @@ async function seedSales(users: Record<string, User>, products: Record<string, P
       },
     },
   });
-
+  console.log('Sales seeded.');
   return { sale };
 }
 
@@ -199,6 +192,7 @@ async function seedStockMovements(
   purchaseOrders: Record<string, PurchaseOrder>,
   sales: Record<string, Sale>
 ) {
+  console.log('Seeding stock movements...');
   await prisma.stockMovement.deleteMany({
     where: {
       OR: [
@@ -214,24 +208,25 @@ async function seedStockMovements(
         productId: products.product1.id,
         type: 'PURCHASE_RECEIPT',
         quantityChange: 30,
-        quantityBefore: 50,
+        quantityBefore: 50, // Assuming initial quantity was 50 before this PO
         quantityAfter: 80,
         reason: `PO #${purchaseOrders.po.poNumber} Received`,
         referenceId: purchaseOrders.po.id,
-        userId: users.admin.id, // Assuming User model and admin user still exist
+        userId: users.admin.id,
       },
       {
         productId: products.product1.id,
         type: 'SALE',
         quantityChange: -2,
-        quantityBefore: 80,
+        quantityBefore: 80, // Quantity after the PO receipt
         quantityAfter: 78,
         reason: `Sale #${sales.sale.saleNumber}`,
         referenceId: sales.sale.id,
-        userId: users.staff.id, // Assuming User model and staff user still exist
+        userId: users.staff.id,
       },
     ],
   });
+  console.log('Stock movements seeded.');
 }
 
 async function main() {
@@ -252,15 +247,18 @@ async function main() {
       defaultTaxRate: 7.5,
     },
   });
+  console.log('App settings seeded.');
 
   const users = await seedUsers();
   const categories = await seedCategories();
   const productsData = await seedProducts(categories);
   
+  // Reset product1 quantity to a known state before PO and Sale simulation
   await prisma.product.update({
     where: { id: productsData.product1.id },
     data: { quantity: 50 } 
   });
+  console.log(`Product ${productsData.product1.name} quantity reset to 50.`);
   
   const purchaseOrders = await seedPurchaseOrders(users, productsData);
   const sales = await seedSales(users, productsData);
@@ -275,3 +273,5 @@ main()
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());
+
+    

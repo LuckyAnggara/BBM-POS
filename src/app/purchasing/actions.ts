@@ -6,7 +6,7 @@ import type { PurchaseOrder as AppPurchaseOrder, PurchaseOrderItem as AppPurchas
 import { revalidatePath } from 'next/cache';
 import type { PurchaseOrderFormValues } from './create/page'; 
 import { increaseProductStockAction } from '@/app/inventory/actions';
-// getSession import removed
+import { getUserSession } from '@/lib/user-session'; // Import new session helper
 
 const mapPrismaProductToAppProductLocal = (prismaProduct: any): Product => {
   if (!prismaProduct) return undefined as unknown as Product;
@@ -37,13 +37,12 @@ const mapPrismaProductToAppProductLocal = (prismaProduct: any): Product => {
 
 const mapPrismaUserToAppUser = (prismaUser: any): AppUser | undefined => {
   if (!prismaUser) return undefined;
-  // Simplified User mapping as NextAuth is removed
   return {
     id: prismaUser.id,
     name: prismaUser.name,
     email: prismaUser.email,
-    role: prismaUser.role, // Assuming role is still part of your Prisma User model
-    avatarUrl: prismaUser.avatarUrl ?? undefined, // Or image from Prisma
+    role: prismaUser.role,
+    avatarUrl: prismaUser.image ?? undefined, // Use 'image' field
     isActive: prismaUser.isActive,
     lastLogin: prismaUser.lastLogin?.toISOString() ?? null,
     createdAt: prismaUser.createdAt.toISOString(),
@@ -65,7 +64,7 @@ const mapPrismaPOToAppPO = (dbPO: any): AppPurchaseOrder => {
     taxes: dbPO.taxes ? dbPO.taxes.toNumber() : null,
     totalAmount: dbPO.totalAmount.toNumber(),
     notes: dbPO.notes ?? null,
-    createdById: dbPO.createdById, // This will be null or need a default if not set
+    createdById: dbPO.createdById,
     createdBy: dbPO.createdBy ? mapPrismaUserToAppUser(dbPO.createdBy) : undefined,
     createdAt: dbPO.createdAt.toISOString(),
     updatedAt: dbPO.updatedAt.toISOString(),
@@ -119,17 +118,11 @@ export async function fetchPurchaseOrderById(id: string): Promise<AppPurchaseOrd
 }
 
 export async function createPurchaseOrder(data: PurchaseOrderFormValues): Promise<AppPurchaseOrder> {
-  // const session = await getSession(); // Removed
-  // if (!session?.user?.id) { // Removed
-  //   throw new Error("User not authenticated or session invalid.");
-  // }
-  // const createdById = session.user.id; // Removed
-  const createdByIdForDbOperations: string | undefined = undefined; // Placeholder
-
-  if (!createdByIdForDbOperations) {
-      console.warn("Creating Purchase Order without a user context. 'createdById' will be undefined.");
-      // Depending on schema, this might fail if createdById is mandatory.
+  const session = await getUserSession();
+  if (!session?.userId) {
+    throw new Error("User not authenticated. Please log in to create a purchase order.");
   }
+  const createdByIdForDbOperations = session.userId;
 
   try {
     const { items, poNumber, supplierName, orderDate, expectedDeliveryDate, status, discountAmount, shippingCost, taxes, notes } = data;
@@ -152,7 +145,7 @@ export async function createPurchaseOrder(data: PurchaseOrderFormValues): Promis
         taxes: finalTaxes,
         totalAmount,
         notes,
-        createdById: createdByIdForDbOperations, // May be undefined
+        createdById: createdByIdForDbOperations,
         items: {
           create: items.map(item => ({
             productId: item.productId,
@@ -176,6 +169,12 @@ export async function createPurchaseOrder(data: PurchaseOrderFormValues): Promis
 }
 
 export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormValues): Promise<AppPurchaseOrder> {
+   const session = await getUserSession(); // Ensure user is logged in for update if needed, or remove if not strict
+   if (!session?.userId) {
+     // Optionally throw error or proceed if updates don't require user tracking strictly
+     console.warn("Updating Purchase Order without a user context.");
+   }
+
   try {
     const { items, poNumber, supplierName, orderDate, expectedDeliveryDate, status, discountAmount, shippingCost, taxes, notes } = data;
 
@@ -212,6 +211,7 @@ export async function updatePurchaseOrder(id: string, data: PurchaseOrderFormVal
                 taxes: finalTaxes,
                 totalAmount,
                 notes,
+                // createdById will not be updated here, it's set on creation
                 items: {
                     create: newItemsData
                 }
@@ -245,9 +245,13 @@ export async function deletePurchaseOrderById(id: string): Promise<void> {
 }
 
 export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrderStatus, itemsToReceive?: AppPurchaseOrderItem[]): Promise<AppPurchaseOrder> {
-  // const session = await getSession(); // Removed
-  // const userIdForMovement = session?.user?.id; // Removed
-  const userIdForMovement: string | undefined = undefined; // Placeholder
+  const session = await getUserSession();
+  const userIdForMovement = session?.userId; 
+  if (!userIdForMovement && status === 'Received') {
+      // Decide policy: error out, or allow with null userId for movement
+      console.warn(`Receiving PO ${id} without a logged-in user. Stock movements will not have a userId.`);
+  }
+
 
   return await prisma.$transaction(async (tx) => {
     const po = await tx.purchaseOrder.findUnique({
@@ -273,29 +277,25 @@ export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrde
             data: { quantityReceived: item.quantityOrdered }
           });
 
+          // Call the global increaseProductStockAction from inventory actions
+          // This action itself should handle revalidation paths for inventory
           await increaseProductStockAction(
             item.productId,
             item.quantityOrdered,
-            'PURCHASE_RECEIPT',
+            'PURCHASE_RECEIPT', // This is StockMovementType
             `Received from PO #${po.poNumber}`,
             po.id,
-            userIdForMovement // May be undefined
+            userIdForMovement 
           );
         } else {
-          console.warn(`Item ${item.productName} is missing an ID, cannot update quantityReceived or stock.`);
+          console.warn(`Item ${item.productName} in PO ${po.poNumber} is missing an ID, cannot update quantityReceived or stock.`);
         }
       }
     }
 
     revalidatePath('/purchasing');
     revalidatePath(`/purchasing/${id}`);
-    if (status === 'Received' && itemsToReceive) {
-        itemsToReceive.forEach(item => {
-            revalidatePath(`/inventory/${item.productId}`);
-            revalidatePath(`/inventory/${item.productId}/history`);
-        });
-        revalidatePath('/inventory');
-    }
+    // Inventory revalidation is handled by increaseProductStockAction
 
     return mapPrismaPOToAppPO(updatedPoData);
   }).catch(error => {
@@ -303,3 +303,5 @@ export async function updatePurchaseOrderStatus(id: string, status: PurchaseOrde
       throw new Error('Could not update PO status.');
   });
 }
+
+    

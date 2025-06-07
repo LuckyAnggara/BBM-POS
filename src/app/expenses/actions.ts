@@ -4,18 +4,17 @@
 import { prisma } from '@/lib/prisma';
 import type { Expense, ExpenseCategory, User as AppUser } from '@/lib/types';
 import { revalidatePath } from 'next/cache';
-// getSession import removed
+import { getUserSession } from '@/lib/user-session'; // Import new session helper
 import { Decimal } from '@prisma/client/runtime/library';
 
 const mapPrismaUserToAppUser = (prismaUser: any): AppUser | undefined => {
   if (!prismaUser) return undefined;
-  // Simplified User mapping
   return {
     id: prismaUser.id,
     name: prismaUser.name,
     email: prismaUser.email,
     role: prismaUser.role,
-    avatarUrl: prismaUser.avatarUrl ?? undefined,
+    avatarUrl: prismaUser.image ?? undefined,
     isActive: prismaUser.isActive,
     lastLogin: prismaUser.lastLogin?.toISOString() ?? null,
     createdAt: prismaUser.createdAt.toISOString(),
@@ -39,7 +38,7 @@ const mapPrismaExpenseToApp = (dbExpense: any): Expense => {
     amount: dbExpense.amount.toNumber(),
     expenseCategoryId: dbExpense.expenseCategoryId,
     category: mapPrismaExpenseCategoryToApp(dbExpense.category),
-    userId: dbExpense.userId, // Will be null or need default if not set
+    userId: dbExpense.userId,
     user: dbExpense.user ? mapPrismaUserToAppUser(dbExpense.user) : undefined,
     notes: dbExpense.notes ?? null,
     createdAt: dbExpense.createdAt.toISOString(),
@@ -92,18 +91,12 @@ export interface ExpenseCreationData {
 }
 
 export async function createExpense(data: ExpenseCreationData): Promise<Expense> {
-  // const session = await getSession(); // Removed
-  // if (!session?.user?.id) { // Removed
-  //   throw new Error("User not authenticated to record an expense.");
-  // }
-  // const userId = session.user.id; // Removed
-  const userIdForDbOperations: string | undefined = undefined; // Placeholder
-  
-  if (!userIdForDbOperations) {
-      console.warn("Creating expense without user context. 'userId' will be undefined.");
-      // Schema might require userId.
+  const session = await getUserSession();
+  if (!session?.userId) {
+    throw new Error("User not authenticated. Please log in to record an expense.");
   }
-
+  const userIdForDbOperations = session.userId;
+  
   try {
     const newDbExpense = await prisma.expense.create({
       data: {
@@ -111,7 +104,7 @@ export async function createExpense(data: ExpenseCreationData): Promise<Expense>
         description: data.description,
         amount: new Decimal(data.amount),
         expenseCategoryId: data.expenseCategoryId,
-        userId: userIdForDbOperations, // May be undefined
+        userId: userIdForDbOperations,
         notes: data.notes,
       },
       include: { category: true, user: true },
@@ -126,6 +119,10 @@ export async function createExpense(data: ExpenseCreationData): Promise<Expense>
 }
 
 export async function deleteExpense(expenseId: string): Promise<void> {
+    // Optionally, add user session check here if only certain users can delete
+    // const session = await getUserSession();
+    // if (!session?.userId) { /* throw error or handle */ }
+
     try {
         await prisma.expense.delete({
             where: {id: expenseId}
@@ -149,3 +146,5 @@ export async function fetchAllExpenseCategoriesAction(): Promise<ExpenseCategory
     throw new Error('Could not fetch expense categories.');
   }
 }
+
+    

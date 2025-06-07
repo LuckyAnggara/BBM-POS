@@ -4,6 +4,8 @@ import type { Metadata } from 'next';
 import { Toaster as SonnerToaster } from 'sonner';
 import { AppShell } from '@/components/layout/app-shell';
 import { SidebarProvider } from '@/components/ui/sidebar';
+// getUserSession can be imported if needed directly in RootLayout for AppShell props
+// import { getUserSession, type UserSessionData } from '@/lib/user-session';
 
 export const metadata: Metadata = {
   title: 'StockPilot',
@@ -15,9 +17,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Authentication logic (auth(), session, user) has been removed.
-  // AppShell no longer receives a user prop from here.
-  // NavUser component will need to be adjusted or will display a generic state.
+  // With custom auth, session data might be fetched here if AppShell needs it directly
+  // const userSession: UserSessionData | null = await getUserSession();
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -38,9 +39,9 @@ export default async function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        {/* NextAuthSessionProvider has been removed */}
         <SidebarProvider>
-          <AppShell> {/* AppShell no longer receives user prop here */}
+          {/* AppShell might need userSession prop if it uses it directly */}
+          <AppShell> 
             {children}
             <SonnerToaster richColors position="top-right" />
           </AppShell>
@@ -49,3 +50,5 @@ export default async function RootLayout({
     </html>
   );
 }
+
+    

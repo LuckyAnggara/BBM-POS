@@ -4,19 +4,18 @@
 import {
   ChevronsUpDown,
   LogOut,
-  UserCircle as UserIcon // Using UserCircle as a generic icon
+  UserCircle as UserIcon,
+  LogIn,
 } from "lucide-react"
-// useSession and signOut removed
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
 } from "@/components/ui/avatar"
-import {Button} from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -28,22 +27,79 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-// logoutUser action removed
+import { useEffect, useState } from "react";
+import { getSessionDataFromServer, logoutUser } from "@/app/login/actions"; // Import server actions
+import type { UserSessionData } from "@/lib/user-session";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-// NavUser no longer relies on NextAuth session
 export function NavUser() {
   const { isMobile } = useSidebar();
+  const router = useRouter();
+  const [session, setSession] = useState<UserSessionData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Placeholder content since there's no authenticated user
-  const userName = "Guest User";
-  const userEmail = "No session";
-  const fallbackName = "G";
+  // This effect runs client-side. 
+  // To get session data, we'd ideally pass it from a server component
+  // or make a client-side API call if cookies are httpOnly.
+  // For this example, we'll try to fetch it (though getSessionDataFromServer is a server action).
+  // A better approach for NavUser as a client component would be an API route.
+  // However, since `getSessionDataFromServer` uses `cookies()`, it *must* run on the server.
+  // So, NavUser should ideally be a Server Component or receive session as prop.
+  // Forcing a re-render via router.refresh() after login/logout is key.
 
-  const handleLoginRedirect = () => {
-    // In a real app without NextAuth, you might redirect to a custom login page
-    // or show a login modal. For now, this is a placeholder.
-    alert("Login functionality has been removed. Please implement a new authentication system if needed.");
+  // This is a placeholder to show how you might fetch/display user info.
+  // In a real app, you'd get this from context or props if NavUser is deeply nested.
+  useEffect(() => {
+    async function fetchSession() {
+      setIsLoading(true);
+      // Calling a server action from a client component like this is fine.
+      const serverSession = await getSessionDataFromServer(); 
+      setSession(serverSession);
+      setIsLoading(false);
+    }
+    fetchSession();
+  }, []);
+
+
+  const handleLogout = async () => {
+    await logoutUser();
+    // router.refresh() will be called by redirect in logoutUser server action.
   };
+
+  if (isLoading) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+           <SidebarMenuButton size="lg" className="animate-pulse">
+             <Avatar className="h-8 w-8 rounded-lg bg-muted" />
+             <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-medium w-20 h-4 bg-muted rounded"></span>
+                <span className="truncate text-xs text-muted-foreground w-16 h-3 bg-muted rounded mt-1"></span>
+              </div>
+           </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
+  }
+
+
+  if (!session) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <Link href="/login" passHref legacyBehavior>
+            <SidebarMenuButton size="lg" as="a">
+              <LogIn className="mr-2 h-5 w-5" />
+              Login
+            </SidebarMenuButton>
+          </Link>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
+  }
+  
+  const fallbackName = session.userName ? session.userName.charAt(0).toUpperCase() : "U";
 
   return (
     <SidebarMenu>
@@ -55,12 +111,12 @@ export function NavUser() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                {/* No userAvatarUrl, using fallback */}
+                {/* <AvatarImage src={user.avatarUrl || undefined} alt={user.name || "User"} /> */}
                 <AvatarFallback className="rounded-lg bg-muted">{fallbackName}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{userName}</span>
-                <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
+                <span className="truncate font-medium">{session.userName}</span>
+                <span className="truncate text-xs text-muted-foreground">{session.userEmail || 'No email'}</span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -77,19 +133,26 @@ export function NavUser() {
                   <AvatarFallback className="rounded-lg bg-muted">{fallbackName}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{userName}</span>
-                  <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
+                  <span className="truncate font-medium">{session.userName}</span>
+                  <span className="truncate text-xs text-muted-foreground">{session.userEmail || 'No email'}</span>
                 </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLoginRedirect} className="cursor-pointer">
+            {/* Add other items like "Profile", "Settings" if needed */}
+            {/* <DropdownMenuItem asChild className="cursor-pointer">
+              <Link href="/profile"><UserIcon className="mr-2 h-4 w-4" /> Profile</Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator /> */}
+            <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive-foreground focus:bg-destructive">
               <LogOut className="mr-2 h-4 w-4" /> 
-              Login (Placeholder)
+              Logout
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }
+
+    

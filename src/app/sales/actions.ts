@@ -4,18 +4,17 @@
 import { prisma } from '@/lib/prisma';
 import type { Sale, Customer, User, Product, Category, StockMovementType, SaleStatus } from '@/lib/types';
 import { StockMovementTypeEnum } from '@/lib/types';
-// getSession import removed
+import { getUserSession } from '@/lib/user-session'; // Import new session helper
 import { revalidatePath } from 'next/cache';
 
 const mapPrismaUserToAppUser = (prismaUser: any): User | undefined => {
   if (!prismaUser) return undefined;
-  // Simplified User mapping as NextAuth is removed
   return {
     id: prismaUser.id,
     name: prismaUser.name,
     email: prismaUser.email,
-    role: prismaUser.role, // Assuming role is still part of your Prisma User model
-    avatarUrl: prismaUser.avatarUrl ?? undefined, // Or image from Prisma
+    role: prismaUser.role,
+    avatarUrl: prismaUser.image ?? undefined,
     isActive: prismaUser.isActive,
     lastLogin: prismaUser.lastLogin?.toISOString() ?? null,
     createdAt: prismaUser.createdAt.toISOString(),
@@ -65,7 +64,7 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
     saleDate: dbSale.saleDate.toISOString(),
     customerId: dbSale.customerId,
     customerName: dbSale.customerName,
-    userId: dbSale.userId, // This will be null or need a default if not set
+    userId: dbSale.userId,
     subtotal: dbSale.subtotal.toNumber(),
     discountAmount: dbSale.discountAmount.toNumber(),
     taxPercent: dbSale.taxPercent.toNumber(),
@@ -91,7 +90,7 @@ const mapPrismaSaleToAppSale = (dbSale: any): Sale => {
       product: item.product ? mapPrismaProductToAppProductLocal(item.product) : undefined,
     })),
     customer: mapPrismaCustomerToAppCustomer(dbSale.customer),
-    user: dbSale.user ? mapPrismaUserToAppUser(dbSale.user) : undefined, // User mapping might be simplified
+    user: dbSale.user ? mapPrismaUserToAppUser(dbSale.user) : undefined,
   };
 };
 
@@ -162,12 +161,11 @@ export async function fetchSaleById(saleId: string): Promise<Sale | null> {
 }
 
 export async function refundSaleAction(saleId: string): Promise<Sale> {
-  // const session = await getSession(); // Removed
-  // if (!session?.user?.id) { // Removed
-  //   throw new Error("User not authenticated or session invalid for refund action.");
-  // }
-  // const userId = session.user.id; // Removed
-  const userIdForDbOperations: string | undefined = undefined; // Placeholder
+  const session = await getUserSession();
+  if (!session?.userId) {
+    throw new Error("User not authenticated. Please log in to process a refund.");
+  }
+  const userIdForDbOperations = session.userId;
 
   return await prisma.$transaction(async (tx) => {
     const saleToRefund = await tx.sale.findUnique({
@@ -224,7 +222,7 @@ export async function refundSaleAction(saleId: string): Promise<Sale> {
           quantityAfter,
           reason: `Return from Sale #${saleToRefund.saleNumber}`,
           referenceId: saleToRefund.id,
-          userId: userIdForDbOperations, // May be undefined
+          userId: userIdForDbOperations,
         },
       });
     }
@@ -250,3 +248,5 @@ export async function refundSaleAction(saleId: string): Promise<Sale> {
     throw new Error('Could not process refund.');
   });
 }
+
+    

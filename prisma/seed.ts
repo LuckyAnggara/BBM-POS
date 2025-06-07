@@ -1,30 +1,34 @@
 
 import { PrismaClient, Category, Product, User, Sale, PurchaseOrder } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+const saltRounds = 10;
+
 async function seedUsers() {
-  // IMPORTANT: In a real application, passwords MUST be hashed using a strong algorithm like bcrypt or argon2.
-  // Storing plain text passwords is a major security vulnerability.
-  const adminPassword = "password123"; // Plain text for demo only
-  const staffPassword = "staffpass";   // Plain text for demo only
+  const adminPasswordPlain = "password123";
+  const staffPasswordPlain = "staffpass";
+
+  const adminPasswordHash = bcrypt.hashSync(adminPasswordPlain, saltRounds);
+  const staffPasswordHash = bcrypt.hashSync(staffPasswordPlain, saltRounds);
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
     update: {
       name: 'Admin User Alice',
       role: 'ADMIN',
-      // password: adminPassword, // Update password if user exists, for demo purposes
+      // password: adminPasswordHash, // Optionally update password if user exists
     },
     create: {
-      id: 'user_admin_alice',
+      id: 'user_admin_alice', // Keep custom ID for consistency if needed
       name: 'Admin User Alice',
       email: 'admin@example.com',
-      password: adminPassword, // Storing plain text: NOT FOR PRODUCTION
+      password: adminPasswordHash,
       role: 'ADMIN',
       isActive: true,
-      avatarUrl: 'https://placehold.co/80x80/7F56D9/FFFFFF.png?text=AA'
+      image: 'https://placehold.co/80x80/7F56D9/FFFFFF.png?text=AA'
     },
   });
 
@@ -33,16 +37,16 @@ async function seedUsers() {
     update: {
       name: 'Staff User Charlie',
       role: 'STAFF',
-      // password: staffPassword, // Update password if user exists, for demo purposes
+      // password: staffPasswordHash, // Optionally update password
     },
     create: {
-      id: 'user_staff_charlie',
+      id: 'user_staff_charlie', // Keep custom ID for consistency if needed
       name: 'Staff User Charlie',
       email: 'staff@example.com',
-      password: staffPassword, // Storing plain text: NOT FOR PRODUCTION
+      password: staffPasswordHash,
       role: 'STAFF',
       isActive: true,
-      avatarUrl: 'https://placehold.co/80x80/64748B/FFFFFF.png?text=SC'
+      image: 'https://placehold.co/80x80/64748B/FFFFFF.png?text=SC'
     },
   });
 
@@ -253,7 +257,6 @@ async function main() {
   const categories = await seedCategories();
   const productsData = await seedProducts(categories);
   
-  // Ensure product1's quantity is reset before specific PO/Sale stock movements for idempotency
   await prisma.product.update({
     where: { id: productsData.product1.id },
     data: { quantity: 50 } 

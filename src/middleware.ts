@@ -1,36 +1,29 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { auth } from '@/lib/auth'; // Import auth from your NextAuth config
 
-// const PROTECTED_ROUTES = ['/']; 
-const PROTECTED_ROUTES = ['/', '/inventory', '/admin', '/pos', '/purchasing', '/sales'];// Add all routes that need auth
-const PUBLIC_ROUTES = ['/login']; // Routes accessible without auth
-// const PUBLIC_ROUTES = ['/login', '/inventory', '/admin', '/pos', '/purchasing', '/sales']; // Routes accessible without auth
+const PROTECTED_ROUTES_PREFIXES = ['/inventory', '/admin', '/pos', '/purchasing', '/sales'];
+const ROOT_ROUTE = '/';
+const PUBLIC_ROUTES = ['/login'];
 
-export function middleware(request: NextRequest) {
-  console.log('aaaaaaaaaaaaa')
-
+export async function middleware(request: NextRequest) {
+  const session = await auth(); // Get session using NextAuth.js
+  const isAuthenticated = !!session?.user;
   const { pathname } = request.nextUrl;
-  const sessionCookie = request.cookies.get('auth_session');
-  const isAuthenticated = !!sessionCookie;
 
-  // Determine if the current path is a protected route
-  const isProtectedRoute = PROTECTED_ROUTES.some(route => {
-    if (route === '/') {
-      return pathname === '/'; // Exact match for the root path
-    }
-    // For other routes, check if pathname is an exact match or a sub-path
-    return pathname === route || pathname.startsWith(route + '/');
-  });
+  const isProtectedRoute = 
+    pathname === ROOT_ROUTE || 
+    PROTECTED_ROUTES_PREFIXES.some(prefix => pathname.startsWith(prefix));
 
-  // If trying to access a protected route without a session, redirect to login
   if (!isAuthenticated && isProtectedRoute) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('callbackUrl', request.nextUrl.pathname); // Pass original path as callback
+    return NextResponse.redirect(loginUrl);
   }
 
-  // If authenticated and trying to access a public route (like /login), redirect to dashboard
   if (isAuthenticated && PUBLIC_ROUTES.includes(pathname)) {
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL(ROOT_ROUTE, request.url));
   }
 
   return NextResponse.next();
@@ -40,11 +33,16 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
+     * - api (API routes, but we need to protect /api/auth for internal NextAuth use)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     *
+     * We explicitly allow /api/auth to ensure NextAuth functions correctly.
+     * Other /api routes could be protected by checking session within their handlers.
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/auth/session).*)', 
+    // Exclude /api/auth/session as it's public for session checks by NextAuth client
+    // /api/auth/* other routes are handled by NextAuth itself.
   ],
 };

@@ -1,6 +1,6 @@
 
 import type {
-  User as PrismaUser,
+  User as PrismaUser, // Keep for direct Prisma interactions if any outside of NextAuth
   Product as PrismaProduct,
   PurchaseOrder as PrismaPurchaseOrder,
   PurchaseOrderItem as PrismaPurchaseOrderItem,
@@ -84,25 +84,30 @@ export interface PurchaseOrder {
   totalAmount: number;
   notes?: string | null;
   createdById: string;
-  createdBy?: User;
+  createdBy?: User; // Application User type
   createdAt: string;
   updatedAt: string;
 }
 
-export type UserRole = string;
+export type UserRole = string; // "ADMIN", "STAFF", "MANAGER"
 
+// Application's User type. NextAuth might use its own User type internally.
+// This type is for what your application logic expects.
 export interface User {
   id: string;
-  name: string;
-  email: string;
-  // password field should not be in client-side User type for security
-  role: UserRole;
-  avatarUrl?: string | null;
-  isActive: boolean;
-  lastLogin?: string | null;
-  createdAt: string;
-  updatedAt: string;
+  name?: string | null; // NextAuth User can have nullable name
+  email?: string | null; // NextAuth User can have nullable email
+  image?: string | null; // NextAuth uses 'image' for avatar
+  avatarUrl?: string | null; // Keep for compatibility or map from 'image'
+  role?: UserRole | null; // Your custom role
+  isActive?: boolean;
+  lastLogin?: string | null; // Should be string (ISO date)
+  emailVerified?: string | null; // string representation of DateTime from NextAuth
+  // Avoid including password in client-side types
+  createdAt?: string; // Should be string (ISO date)
+  updatedAt?: string; // Should be string (ISO date)
 }
+
 
 export interface Supplier {
   id: string;
@@ -139,12 +144,12 @@ export type SaleStatus = 'PendingPayment' | 'Completed' | 'Refunded' | 'Cancelle
 export interface Sale extends Omit<PrismaSale, 'createdAt' | 'updatedAt' | 'saleDate' | 'customer' | 'user' | 'items' | 'status' | 'cashTransaction' | 'cashTransactionId'> {
   saleDate: string;
   customer?: Customer | null;
-  user?: User;
+  user?: User; // Application User type
   items: SaleItem[];
   status: SaleStatus;
   paymentMethod?: string | null;
   cashTransactionId?: string | null;
-  cashTransaction?: CashTransaction | null; // Optional for full data load
+  cashTransaction?: CashTransaction | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -164,11 +169,10 @@ export const StockMovementTypeEnum = PrismaClientStockMovementType;
 export interface StockMovement extends Omit<PrismaStockMovement, 'createdAt' | 'product' | 'user' | 'type'> {
   type: StockMovementType;
   product?: Product;
-  user?: User;
+  user?: User; // Application User type
   createdAt: string;
 }
 
-// POS Cash Management Types
 export type PosSessionStatus = PrismaClientPosSessionStatus;
 export const PosSessionStatusEnum = PrismaClientPosSessionStatus;
 
@@ -184,8 +188,8 @@ export interface PosSession extends Omit<PrismaPosSession, 'startTime' | 'endTim
   expectedCashInDrawer: number;
   totalSalesAmount: number;
   totalRefundsAmount: number;
-  user?: User; // User who owns the session
-  cashTransactions?: CashTransaction[]; // Transactions within this session
+  user?: User; // Application User type
+  cashTransactions?: CashTransaction[];
   createdAt: string;
   updatedAt: string;
 }
@@ -193,13 +197,12 @@ export interface PosSession extends Omit<PrismaPosSession, 'startTime' | 'endTim
 export interface CashTransaction extends Omit<PrismaCashTransaction, 'createdAt' | 'posSession' | 'user' | 'amount' | 'type' | 'sale'> {
   type: CashTransactionType;
   amount: number;
-  user?: User; // User who performed the transaction
-  posSession?: PosSession; // The session this transaction belongs to
-  sale?: Sale; // If this transaction is linked to a sale
+  user?: User; // Application User type
+  posSession?: PosSession;
+  sale?: Sale;
   createdAt: string;
 }
 
-// Reports Types
 export interface IncomeStatementData {
   revenue: number;
   cogs: number;
@@ -210,19 +213,16 @@ export interface IncomeStatementData {
   endDate: string;
 }
 
-// Expenses Module Types
 export interface ExpenseCategory extends Omit<PrismaExpenseCategory, 'createdAt' | 'updatedAt'> {
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Expense extends Omit<PrismaExpense, 'createdAt' | 'updatedAt' | 'date' | 'amount' | 'user' | 'category'> {
-  date: string; // ISO string
+  date: string;
   amount: number;
-  user?: User; // User who recorded the expense
-  category: ExpenseCategory; // Expense category
+  user?: User; // Application User type
+  category: ExpenseCategory;
   createdAt: string;
   updatedAt: string;
 }
-
-    

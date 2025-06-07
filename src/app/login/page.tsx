@@ -9,9 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { loginUser } from '@/app/auth/actions';
-// useRouter is not strictly needed for redirect if server action handles it
-// import { useRouter } from 'next/navigation'; 
+import { signIn } from 'next-auth/react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Loader2, LogIn } from 'lucide-react';
 
@@ -23,7 +22,9 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  // const router = useRouter(); // Not needed if server action redirects
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/';
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -39,32 +40,33 @@ export default function LoginPage() {
     setError(null);
     startTransition(async () => {
       try {
-        // loginUser will throw NEXT_REDIRECT on success, which Next.js handles.
-        // If it returns, it means there was an error.
-        const result = await loginUser(data);
-        
-        if (result && !result.success) { // Check if result is returned (meaning no redirect occurred)
-          setError(result.error || 'Email atau password salah.');
-          toast.error(result.error || 'Email atau password salah.');
-        } else if (result?.success) { 
-          // This block should ideally not be reached if redirect happens in server action
-          // Kept for robustness in case redirect handling changes or for non-redirect success
-          toast.success('Login berhasil!');
-          // window.location.assign('/'); // Replaced by server action redirect
-        }
-      } catch (e: any) {
-        // Catch errors, including NEXT_REDIRECT if not automatically handled higher up
-        // For NEXT_REDIRECT, Next.js should handle the client-side navigation.
-        if (e.digest?.startsWith('NEXT_REDIRECT')) {
-          // This is expected on successful login. Next.js will handle the redirect.
-          // No explicit client-side action needed here.
-          toast.success('Login berhasil! Mengarahkan...'); // Optional: inform user
-        } else {
-          console.error('Login error:', e);
-          const errorMessage = e instanceof Error ? e.message : 'Terjadi kesalahan saat login.';
+        const result = await signIn('credentials', {
+          redirect: false,
+          email: data.email,
+          password: data.password,
+        });
+
+        if (result?.error) {
+          let errorMessage = 'Email atau password salah.';
+          if (result.error === 'CredentialsSignin') {
+             errorMessage = 'Kombinasi email dan password tidak valid.';
+          } else if (result.error.includes("User account is inactive")) {
+             errorMessage = 'Akun pengguna ini tidak aktif.';
+          } else {
+             errorMessage = result.error; // Show other errors from NextAuth
+          }
           setError(errorMessage);
           toast.error(errorMessage);
+        } else if (result?.ok) {
+          toast.success('Login berhasil! Mengarahkan...');
+          router.push(callbackUrl); // Redirect to callbackUrl or dashboard
+          router.refresh(); // To ensure layout re-renders with new session
         }
+      } catch (e: any) {
+        console.error('Login error:', e);
+        const errorMessage = e instanceof Error ? e.message : 'Terjadi kesalahan saat login.';
+        setError(errorMessage);
+        toast.error(errorMessage);
       }
     });
   };

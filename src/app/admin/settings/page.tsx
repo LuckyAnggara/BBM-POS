@@ -1,12 +1,12 @@
 
 'use client';
-import { useEffect, useState } from 'react'; // Added useState
+import { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Bell, Building, Palette, ShieldCheck, Loader2, Percent } from "lucide-react";
+import { Save, Bell, Building, Palette, ShieldCheck, Loader2, Percent, Globe, Binary, Milestone } from "lucide-react"; // Added Globe, Binary, Milestone
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -37,7 +37,10 @@ const generalSettingsSchema = z.object({
   appName: z.string().min(1, "Application name is required"),
   dateFormat: z.string(),
   timeZone: z.string(),
-  defaultCurrency: z.string().length(3, "Currency code must be 3 letters"),
+  defaultCurrency: z.string().min(3, "Currency code must be 3 letters").max(3, "Currency code must be 3 letters"), // For USD, IDR
+  currencySymbol: z.string().max(5, "Symbol too long").optional().nullable(), // For $, Rp
+  currencySuffix: z.string().max(5, "Suffix too long").optional().nullable(), // For ,-
+  currencyDecimalPlaces: z.coerce.number().int().min(0, "Must be non-negative").max(4, "Max 4 decimal places"),
   defaultTaxRate: z.coerce.number().min(0, "Tax rate must be non-negative").max(100, "Tax rate cannot exceed 100"),
 });
 
@@ -54,21 +57,19 @@ type NotificationSettingsValues = z.infer<typeof notificationSettingsSchema>;
 
 export default function SettingsPage() {
   usePageTitle('System Settings');
-  const [isPageLoading, setIsPageLoading] = useState(true); // New state for initial load
+  const [isPageLoading, setIsPageLoading] = useState(true); 
 
   const generalForm = useForm<GeneralSettingsValues>({
     resolver: zodResolver(generalSettingsSchema),
-    // Default values will be loaded from DB
   });
 
   const notificationForm = useForm<NotificationSettingsValues>({
     resolver: zodResolver(notificationSettingsSchema),
-    // Default values will be loaded from DB
   });
 
   useEffect(() => {
     async function loadSettings() {
-      setIsPageLoading(true); // Use local state
+      setIsPageLoading(true); 
       try {
         const settings = await fetchAppSettings();
         generalForm.reset({
@@ -76,6 +77,9 @@ export default function SettingsPage() {
           dateFormat: settings.dateFormat,
           timeZone: settings.timeZone,
           defaultCurrency: settings.defaultCurrency,
+          currencySymbol: settings.currencySymbol,
+          currencySuffix: settings.currencySuffix,
+          currencyDecimalPlaces: settings.currencyDecimalPlaces,
           defaultTaxRate: settings.defaultTaxRate,
         });
         notificationForm.reset({
@@ -87,42 +91,36 @@ export default function SettingsPage() {
         toast.error("Failed to load settings.");
         console.error(error);
       } finally {
-        setIsPageLoading(false); // Use local state
+        setIsPageLoading(false); 
       }
     }
     loadSettings();
-  }, [generalForm, notificationForm]); // Dependencies remain the same
+  }, [generalForm, notificationForm]); 
 
   const onGeneralSubmit: SubmitHandler<GeneralSettingsValues> = async (data) => {
-    // react-hook-form's formState.isSubmitting will be true while this async function runs
     try {
       await saveAppSettings(data);
       toast.success("General settings saved successfully!");
     } catch (error) {
       toast.error("Failed to save general settings.");
     }
-    // No need to manually set isSubmitting to false, RHF handles it
   };
   
   const onNotificationSubmit: SubmitHandler<NotificationSettingsValues> = async (data) => {
-    // react-hook-form's formState.isSubmitting will be true
     try {
       await saveAppSettings(data);
       toast.success("Notification settings saved successfully!");
     } catch (error) {
        toast.error("Failed to save notification settings.");
     }
-    // No need to manually set isSubmitting to false
   };
   
-  // Use react-hook-form's built-in isSubmitting
   const isGeneralSubmitting = generalForm.formState.isSubmitting;
   const isNotificationSubmitting = notificationForm.formState.isSubmitting;
 
   return (
     <Card>
-      {/* CardHeader removed as title is now in AppShell */}
-      <CardContent className="pt-6"> {/* Added pt-6 for spacing */}
+      <CardContent className="pt-6"> 
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
             <TabsTrigger value="general"><Building className="mr-2 h-4 w-4 inline-block" />General</TabsTrigger>
@@ -135,16 +133,12 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>General Settings</CardTitle>
-                <CardDescription>Basic application settings including default tax rate.</CardDescription>
+                <CardDescription>Application-wide settings including currency and tax.</CardDescription>
               </CardHeader>
               <CardContent>
-                {isPageLoading ? ( // Use local state for skeleton
+                {isPageLoading ? ( 
                   <div className="space-y-6">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-1/2" />
-                    <Skeleton className="h-10 w-full" /> 
+                    {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
                     <Skeleton className="h-10 w-48" />
                   </div>
                 ) : (
@@ -163,70 +157,128 @@ export default function SettingsPage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={generalForm.control}
-                      name="dateFormat"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date Format</FormLabel>
-                           <Select onValueChange={field.onChange} value={field.value} disabled={isGeneralSubmitting}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a date format" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="MM/dd/yyyy">MM/DD/YYYY (e.g., 07/25/2024)</SelectItem>
-                              <SelectItem value="dd/MM/yyyy">DD/MM/YYYY (e.g., 25/07/2024)</SelectItem>
-                              <SelectItem value="yyyy-MM-dd">YYYY-MM-DD (e.g., 2024-07-25)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={generalForm.control}
-                      name="timeZone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Time Zone</FormLabel>
-                           <Select onValueChange={field.onChange} value={field.value} disabled={isGeneralSubmitting}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a time zone" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {/* Add more timezones as needed */}
-                              <SelectItem value="America/New_York">America/New_York (EST/EDT)</SelectItem>
-                              <SelectItem value="Europe/London">Europe/London (GMT/BST)</SelectItem>
-                              <SelectItem value="Asia/Tokyo">Asia/Tokyo (JST)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={generalForm.control}
-                      name="defaultCurrency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Default Currency</FormLabel>
-                          <FormControl>
-                            <Input placeholder="USD" {...field} disabled={isGeneralSubmitting} />
-                          </FormControl>
-                          <FormDescription>Enter the 3-letter currency code (e.g., USD, EUR).</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <FormField
+                        control={generalForm.control}
+                        name="dateFormat"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Date Format</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isGeneralSubmitting}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a date format" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                <SelectItem value="MM/dd/yyyy">MM/DD/YYYY (e.g., 07/25/2024)</SelectItem>
+                                <SelectItem value="dd/MM/yyyy">DD/MM/YYYY (e.g., 25/07/2024)</SelectItem>
+                                <SelectItem value="yyyy-MM-dd">YYYY-MM-DD (e.g., 2024-07-25)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={generalForm.control}
+                        name="timeZone"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Time Zone</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isGeneralSubmitting}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a time zone" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                <SelectItem value="America/New_York">America/New_York (EST/EDT)</SelectItem>
+                                <SelectItem value="Europe/London">Europe/London (GMT/BST)</SelectItem>
+                                <SelectItem value="Asia/Tokyo">Asia/Tokyo (JST)</SelectItem>
+                                <SelectItem value="Asia/Jakarta">Asia/Jakarta (WIB)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                    </div>
+                    
+                    <CardTitle className="text-lg pt-2 border-t">Currency Settings</CardTitle>
+                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <FormField
+                            control={generalForm.control}
+                            name="defaultCurrency"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel className="flex items-center gap-1"><Globe className="h-4 w-4"/>Currency Code</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value} disabled={isGeneralSubmitting}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select currency" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="USD">USD - United States Dollar</SelectItem>
+                                        <SelectItem value="IDR">IDR - Indonesian Rupiah</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormDescription>ISO 4217 code.</FormDescription>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={generalForm.control}
+                            name="currencySymbol"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel className="flex items-center gap-1"><Milestone className="h-4 w-4"/>Symbol</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="e.g., $ or Rp" {...field} value={field.value ?? ''} disabled={isGeneralSubmitting} />
+                                </FormControl>
+                                <FormDescription>Prefix symbol.</FormDescription>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={generalForm.control}
+                            name="currencySuffix"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel className="flex items-center gap-1"><Milestone className="h-4 w-4 rotate-180"/>Suffix</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="e.g., ,-" {...field} value={field.value ?? ''} disabled={isGeneralSubmitting} />
+                                </FormControl>
+                                 <FormDescription>Text after amount.</FormDescription>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={generalForm.control}
+                            name="currencyDecimalPlaces"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel className="flex items-center gap-1"><Binary className="h-4 w-4"/>Decimals</FormLabel>
+                                <FormControl>
+                                    <Input type="number" placeholder="2" {...field} disabled={isGeneralSubmitting} />
+                                </FormControl>
+                                <FormDescription>0 for IDR, 2 for USD.</FormDescription>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+
+                    <CardTitle className="text-lg pt-2 border-t">Tax Settings</CardTitle>
                      <FormField
                       control={generalForm.control}
                       name="defaultTaxRate"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="max-w-xs">
                           <FormLabel>Default Tax Rate (%)</FormLabel>
                           <FormControl>
                             <div className="relative">
@@ -257,7 +309,7 @@ export default function SettingsPage() {
                 <CardDescription>Manage how you receive notifications.</CardDescription>
               </CardHeader>
               <CardContent>
-                {isPageLoading ? ( // Use local state for skeleton
+                {isPageLoading ? ( 
                     <div className="space-y-6">
                         <Skeleton className="h-16 w-full" />
                         <Skeleton className="h-16 w-full" />
@@ -350,5 +402,3 @@ export default function SettingsPage() {
     </Card>
   );
 }
-
-    

@@ -11,8 +11,10 @@ const DEFAULT_SETTINGS_ID = 'main_settings';
 const mapPrismaSettingsToAppSettings = (prismaSettings: any): AppSettings => {
   return {
     ...prismaSettings,
-    // Ensure defaultTaxRate is converted from Decimal to number
+    // Ensure numeric fields are converted from Decimal to number
     defaultTaxRate: prismaSettings.defaultTaxRate ? prismaSettings.defaultTaxRate.toNumber() : 0,
+    // currencyDecimalPlaces is already Int in Prisma, so direct assignment is fine
+    currencyDecimalPlaces: prismaSettings.currencyDecimalPlaces, 
     createdAt: prismaSettings.createdAt.toISOString(),
     updatedAt: prismaSettings.updatedAt.toISOString(),
   };
@@ -34,10 +36,13 @@ export async function fetchAppSettings(): Promise<AppSettings> {
           dateFormat: 'MM/dd/yyyy',
           timeZone: 'America/New_York',
           defaultCurrency: 'USD',
+          currencySymbol: '$',
+          currencySuffix: '',
+          currencyDecimalPlaces: 2,
           emailNotifications: true,
           lowStockAlerts: true,
           newOrderAlerts: false,
-          defaultTaxRate: 0, // Default to 0% tax
+          defaultTaxRate: 0, 
         },
       });
       console.log('Default app settings created.');
@@ -56,17 +61,19 @@ export async function saveAppSettings(data: Partial<Omit<AppSettings, 'id' | 'cr
       where: { id: DEFAULT_SETTINGS_ID },
       data: {
         ...data,
-        // Ensure conversion to number before saving if it's provided
+        // Ensure conversion to number for numeric fields if provided
         defaultTaxRate: data.defaultTaxRate !== undefined ? Number(data.defaultTaxRate) : undefined,
+        currencyDecimalPlaces: data.currencyDecimalPlaces !== undefined ? Number(data.currencyDecimalPlaces) : undefined,
       }
     });
     revalidatePath('/admin/settings');
-    // Potentially revalidate other paths if settings affect them, e.g., POS if tax rate changes
+    // Potentially revalidate other paths if settings affect them
     revalidatePath('/pos');
+    revalidatePath('/sales/history');
+    revalidatePath('/reports/income-statement');
     return mapPrismaSettingsToAppSettings(updatedSettings);
   } catch (error) {
     console.error('Failed to save app settings:', error);
     throw new Error('Could not save app settings.');
   }
 }
-

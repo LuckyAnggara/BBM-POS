@@ -17,7 +17,7 @@ async function seedUsers() {
     update: {
       name: 'Admin User Alice',
       role: 'ADMIN',
-      password: adminPassword, // Ensure password field exists in your User model
+      password: adminPassword, 
     },
     create: {
       id: 'user_admin_alice',
@@ -26,7 +26,7 @@ async function seedUsers() {
       role: 'ADMIN',
       isActive: true,
       image: 'https://placehold.co/80x80/7F56D9/FFFFFF.png?text=AA',
-      password: adminPassword, // Ensure password field exists
+      password: adminPassword, 
     },
   });
 
@@ -35,7 +35,7 @@ async function seedUsers() {
     update: {
       name: 'Staff User Charlie',
       role: 'STAFF',
-      password: staffPassword, // Ensure password field exists
+      password: staffPassword, 
     },
     create: {
       id: 'user_staff_charlie',
@@ -44,7 +44,7 @@ async function seedUsers() {
       role: 'STAFF',
       isActive: true,
       image: 'https://placehold.co/80x80/64748B/FFFFFF.png?text=SC',
-      password: staffPassword, // Ensure password field exists
+      password: staffPassword, 
     },
   });
   console.log('Users seeded (passwords are hashed).');
@@ -244,20 +244,28 @@ async function main() {
 
   await prisma.appSettings.upsert({
     where: { id: 'main_settings' },
-    update: {},
+    update: { // Add new currency fields if updating existing settings
+      defaultCurrency: "USD",
+      currencySymbol: "$",
+      currencySuffix: "",
+      currencyDecimalPlaces: 2,
+    },
     create: {
       id: 'main_settings',
       appName: 'StockPilot',
       dateFormat: 'MM/dd/yyyy',
       timeZone: 'America/New_York',
       defaultCurrency: 'USD',
+      currencySymbol: '$',
+      currencySuffix: '',
+      currencyDecimalPlaces: 2,
       emailNotifications: true,
       lowStockAlerts: true,
       newOrderAlerts: false,
       defaultTaxRate: 7.5,
     },
   });
-  console.log('App settings seeded.');
+  console.log('App settings seeded/updated with currency fields.');
 
   const users = await seedUsers();
   const categories = await seedCategories();

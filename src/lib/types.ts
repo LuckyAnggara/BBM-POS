@@ -83,25 +83,23 @@ export interface PurchaseOrder {
   taxes?: number | null;
   totalAmount: number;
   notes?: string | null;
-  createdById?: string | null; // Made optional as user context might be removed
+  createdById?: string | null; 
   createdBy?: User;
   createdAt: string;
   updatedAt: string;
 }
 
-export type UserRole = string; // "ADMIN", "STAFF", "MANAGER"
+export type UserRole = string; 
 
-// Application's User type. Adjusted after NextAuth removal.
 export interface User {
   id: string;
   name?: string | null;
   email?: string | null;
-  image?: string | null; // Kept as it might be used for general avatar
+  image?: string | null; 
   avatarUrl?: string | null;
   role?: UserRole | null;
   isActive?: boolean;
   lastLogin?: string | null;
-  // emailVerified removed
   createdAt?: string;
   updatedAt?: string;
 }
@@ -119,8 +117,11 @@ export interface Supplier {
   updatedAt: string;
 }
 
-export interface AppSettings extends Omit<PrismaAppSettings, 'createdAt' | 'updatedAt' | 'defaultTaxRate'> {
+export interface AppSettings extends Omit<PrismaAppSettings, 'createdAt' | 'updatedAt' | 'defaultTaxRate' | 'currencyDecimalPlaces'> {
   defaultTaxRate: number;
+  currencyDecimalPlaces: number;
+  currencySymbol: string; 
+  currencySuffix: string; 
   createdAt: string;
   updatedAt: string;
 }
@@ -142,8 +143,8 @@ export type SaleStatus = 'PendingPayment' | 'Completed' | 'Refunded' | 'Cancelle
 export interface Sale extends Omit<PrismaSale, 'createdAt' | 'updatedAt' | 'saleDate' | 'customer' | 'user' | 'items' | 'status' | 'cashTransaction' | 'cashTransactionId'> {
   saleDate: string;
   customer?: Customer | null;
-  user?: User; // Application User type
-  userId?: string | null; // Made optional
+  user?: User; 
+  userId?: string | null; 
   items: SaleItem[];
   status: SaleStatus;
   paymentMethod?: string | null;
@@ -160,7 +161,6 @@ export type SaleDataForCreation = Omit<Sale, 'id' | 'saleNumber' | 'createdAt' |
   cartItems: CartItem[];
   paymentMethod: string;
   status?: SaleStatus;
-  // userId is removed from this type, should be handled by the action if needed
 };
 
 export type StockMovementType = PrismaClientStockMovementType;
@@ -170,7 +170,7 @@ export interface StockMovement extends Omit<PrismaStockMovement, 'createdAt' | '
   type: StockMovementType;
   product?: Product;
   user?: User;
-  userId?: string | null; // Made optional
+  userId?: string | null; 
   createdAt: string;
 }
 
@@ -181,14 +181,14 @@ export type CashTransactionType = PrismaClientCashTransactionType;
 export const CashTransactionTypeEnum = PrismaClientCashTransactionType;
 
 export interface PosSession extends Omit<PrismaPosSession, 'startTime' | 'endTime' | 'createdAt' | 'updatedAt' | 'user' | 'cashTransactions' | 'startingCash' | 'countedCash' | 'expectedCashInDrawer' | 'totalSalesAmount' | 'totalRefundsAmount' | 'status' | 'userId'> {
-  userId?: string | null; // Made optional
+  userId?: string | null; 
   startTime: string;
   endTime?: string | null;
   status: PosSessionStatus;
   startingCash: number;
   countedCash?: number | null;
   expectedCashInDrawer: number;
-  cashDifference?: number | null; // Added for calculated difference
+  cashDifference?: number | null; 
   totalSalesAmount: number;
   totalRefundsAmount: number;
   user?: User;
@@ -198,7 +198,7 @@ export interface PosSession extends Omit<PrismaPosSession, 'startTime' | 'endTim
 }
 
 export interface CashTransaction extends Omit<PrismaCashTransaction, 'createdAt' | 'posSession' | 'user' | 'amount' | 'type' | 'sale' | 'userId'> {
-  userId?: string | null; // Made optional
+  userId?: string | null; 
   type: CashTransactionType;
   amount: number;
   user?: User;
@@ -223,7 +223,7 @@ export interface ExpenseCategory extends Omit<PrismaExpenseCategory, 'createdAt'
 }
 
 export interface Expense extends Omit<PrismaExpense, 'createdAt' | 'updatedAt' | 'date' | 'amount' | 'user' | 'category' | 'userId'> {
-  userId?: string | null; // Made optional
+  userId?: string | null; 
   date: string;
   amount: number;
   user?: User;

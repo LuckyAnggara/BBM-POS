@@ -3,6 +3,6 @@
 import { AppShell } from '@/components/layout/app-shell';
 import type { ReactNode } from 'react';
 
-export default function SalesLayout({ children }: { children: ReactNode }) {
+export default function PurchasingLayout({ children }: { children: ReactNode }) {
   return <AppShell>{children}</AppShell>;
 }

@@ -112,7 +112,7 @@ export default function AddProductPage() {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className='flex flex-col space-y-4'>
           <Card>
             <CardHeader>
               <CardTitle>Product Information</CardTitle>
